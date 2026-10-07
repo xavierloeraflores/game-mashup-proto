@@ -76,6 +76,14 @@ function versionAtLeast(actual: string, minimum: string): boolean {
   return true;
 }
 
+export function managedJvmArguments(instance: string, existing?: unknown): string {
+  const modsDir = join(instance, 'mods').replace(/\\/g, '/');
+  if (modsDir.includes('"')) throw new Error('The managed instance path cannot contain a double quote.');
+  const base = typeof existing === 'string' && existing.trim() ? existing.trim() : '-Xmx2G';
+  const withoutOverride = base.replace(/(?:^|\s)(?:"-Dfabric\.modsFolder=[^"]*"|-Dfabric\.modsFolder=\S+)/g, '').trim();
+  return `${withoutOverride} "-Dfabric.modsFolder=${modsDir}"`;
+}
+
 export function javaMajorVersion(output: string): number | undefined {
   const match = output.match(/(?:java|openjdk) version "(\d+)(?:\.(\d+))?/i);
   if (!match) return undefined;
@@ -273,6 +281,8 @@ export class MarioInstaller {
       const path = join(minecraftRoot, name);
       const data = await readJson<Record<string, unknown>>(path);
       if (data && typeof data.profiles === 'object' && data.profiles !== null && PROFILE_ID in data.profiles) {
+        const profiles = data.profiles as Record<string, Record<string, unknown>>;
+        profiles[PROFILE_ID].javaArgs = managedJvmArguments(this.instancePath(), profiles[PROFILE_ID].javaArgs);
         data.selectedProfile = PROFILE_ID;
         await atomicJson(path, data);
         return;
@@ -355,6 +365,7 @@ export class MarioInstaller {
     const version = `fabric-loader-${loader}-${MINECRAFT_VERSION}`;
     data.profiles[PROFILE_ID] = {
       ...data.profiles[PROFILE_ID], name: 'Mario 64 in Minecraft', type: 'custom', gameDir: this.instancePath(),
+      javaArgs: managedJvmArguments(this.instancePath(), data.profiles[PROFILE_ID]?.javaArgs),
       lastVersionId: version, created: data.profiles[PROFILE_ID]?.created ?? new Date().toISOString(), lastUsed: new Date().toISOString(),
     };
     await atomicJson(path, data);

@@ -136,7 +136,7 @@ function registerIpc(): void {
     if (!state.ready || !state.minecraftRoot) throw new Error('Installation is not ready.');
     await installer().selectProfile(state.minecraftRoot);
     await openMinecraftLauncher();
-    return 'Minecraft Launcher opened with the Mario 64 profile selected. Press Play in Minecraft Launcher.';
+    return 'Minecraft Launcher opened. In its bottom-left installation dropdown, choose “Mario 64 in Minecraft” (Fabric 1.21.4), then press Play. The official Launcher may ignore the saved profile selection.';
   }));
   ipcMain.handle('open-source', async () => { await shell.openExternal('https://github.com/Zckyy/mario64-in-minecraft'); });
 }

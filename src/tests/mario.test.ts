@@ -5,7 +5,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { strToU8, zipSync } from 'fflate';
-import { MarioInstaller, PROFILE_ID, ROM_SHA1, fabricInstallerSha256, githubAssetSha256, javaMajorVersion, validateMarioJar } from '../core/mario';
+import { MarioInstaller, PROFILE_ID, ROM_SHA1, fabricInstallerSha256, githubAssetSha256, javaMajorVersion, managedJvmArguments, validateMarioJar } from '../core/mario';
+
+test('managed profile points Fabric at its isolated mods folder', () => {
+  const args = managedJvmArguments('C:\\Games With Spaces\\mario64');
+  assert.equal(args, '-Xmx2G "-Dfabric.modsFolder=C:/Games With Spaces/mario64/mods"');
+  assert.equal(managedJvmArguments('C:\\Games With Spaces\\mario64', args), args);
+  assert.equal(managedJvmArguments('/games/mario64', '-Xmx4G -Dfabric.modsFolder=/old/mods'), '-Xmx4G "-Dfabric.modsFolder=/games/mario64/mods"');
+});
 
 test('GitHub release JAR requires a complete SHA-256 digest', () => {
   assert.equal(githubAssetSha256(`sha256:${'A'.repeat(64)}`), 'a'.repeat(64));

@@ -149,7 +149,7 @@ $('run-build').addEventListener('click', () => action(async () => {
   try {
     const result = await window.launcher.install(commit);
     render(result.state);
-    notice('Installation verified. Open the selected profile in Minecraft Launcher, enter a single-player world, and press M to become Mario.');
+    notice('Installation files verified. In Minecraft Launcher, choose “Mario 64 in Minecraft” from the bottom-left installation dropdown, press Play, enter a single-player world, then press M with chat closed.');
   } finally { $('install').disabled = false; }
 }));
 $('play').addEventListener('click', () => action(async () => notice(await window.launcher.play())));
