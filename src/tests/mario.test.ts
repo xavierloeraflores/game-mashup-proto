@@ -75,7 +75,7 @@ test('installation verification checks the isolated profile and ROM contents', a
   try {
     const minecraft = join(root, '.minecraft');
     const installer = new MarioInstaller(root);
-    const instance = installer.instancePath();
+    const instance = installer.instancePath(minecraft);
     const version = managedFabricVersionId('0.16.10');
     await mkdir(join(minecraft, 'versions', version), { recursive: true });
     await mkdir(join(minecraft, 'versions', '1.21.4'), { recursive: true });
@@ -105,5 +105,31 @@ test('installation verification checks the isolated profile and ROM contents', a
     await writeFile(join(instance, 'mods', 'fabric-api-0.119.4+1.21.4.jar'), 'corrupt jar');
     assert.equal((await installer.verify(minecraft)).find(item => item.id === 'fabric-api')?.ok, false);
     await assert.rejects(() => installer.selectProfile(minecraft), /not ready/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('legacy Mario instance migrates into Minecraft data without replacing existing worlds', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mashup-migrate-'));
+  try {
+    const minecraft = join(root, '.minecraft');
+    const installer = new MarioInstaller(root);
+    const legacy = join(root, 'minecraft-instances', 'mario64');
+    const instance = installer.instancePath(minecraft);
+    await mkdir(join(legacy, 'mods'), { recursive: true });
+    await mkdir(join(legacy, 'config', 'mario64'), { recursive: true });
+    await mkdir(join(legacy, 'saves', 'world'), { recursive: true });
+    await mkdir(join(instance, 'saves', 'world'), { recursive: true });
+    await writeFile(join(legacy, 'installation.json'), JSON.stringify({ minecraftRoot: minecraft, installedVersion: '0.1.0', fabricApiFile: 'fabric-api-0.119.4+1.21.4.jar', instancePath: legacy }));
+    await writeFile(join(legacy, 'mods', 'mario64mc-0.1.0.jar'), 'mario');
+    await writeFile(join(legacy, 'config', 'mario64', 'baserom.us.z64'), 'rom');
+    await writeFile(join(legacy, 'saves', 'world', 'level.dat'), 'old world');
+    await writeFile(join(instance, 'saves', 'world', 'level.dat'), 'new world');
+    await installer.migrateLegacyInstance(minecraft);
+    assert.equal(await readFile(join(instance, 'mods', 'mario64mc-0.1.0.jar'), 'utf8'), 'mario');
+    assert.equal(await readFile(join(instance, 'config', 'mario64', 'baserom.us.z64'), 'utf8'), 'rom');
+    assert.equal(await readFile(join(instance, 'saves', 'world', 'level.dat'), 'utf8'), 'new world');
+    assert.equal(JSON.parse(await readFile(join(instance, 'installation.json'), 'utf8')).instancePath, instance);
+    assert.match(await readFile(join(instance, 'mashup-mods.txt'), 'utf8'), /mario64mc-0\.1\.0\.jar/);
+    assert.equal(await readFile(join(legacy, 'saves', 'world', 'level.dat'), 'utf8'), 'old world');
   } finally { await rm(root, { recursive: true, force: true }); }
 });

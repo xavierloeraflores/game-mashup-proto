@@ -68,12 +68,12 @@ function render(data) {
     future.append(item);
   }
 
-  $('play').disabled = !data.ready && !data.profileRepairable;
-  $('play').textContent = data.profileRepairable ? 'Repair profile & open Launcher ▶' : 'Play ▶';
+  $('play').disabled = !data.ready && !data.profileRepairable && !data.romRepairable;
+  $('play').textContent = data.romRepairable ? 'Repair ROM & open Launcher ▶' : data.profileRepairable ? 'Repair profile & open Launcher ▶' : 'Play ▶';
   $('open-minecraft').disabled = !data.minecraft.launcherInstalled;
   $('managed-tools').hidden = !data.managedToolsAvailable;
   const badge = $('ready-badge');
-  badge.textContent = data.ready ? 'READY TO PLAY' : data.profileRepairable ? 'PROFILE REPAIR READY' : 'SETUP NEEDED';
+  badge.textContent = data.ready ? 'READY TO PLAY' : data.romRepairable ? 'ROM REPAIR READY' : data.profileRepairable ? 'PROFILE REPAIR READY' : 'SETUP NEEDED';
   badge.className = `status-badge${data.ready ? ' ready' : ''}`;
   $('install').textContent = data.ready ? 'Reinstall / repair ↗' : 'Install mashup ↗';
 }

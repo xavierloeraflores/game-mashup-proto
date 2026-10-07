@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { platform } from 'node:os';
@@ -150,7 +150,20 @@ async function atomicJson(path: string, value: unknown): Promise<void> {
 export class MarioInstaller {
   constructor(readonly dataRoot: string, private readonly log: LogHandler = () => {}) {}
 
-  instancePath(): string { return join(this.dataRoot, 'minecraft-instances', 'mario64'); }
+  instancePath(minecraftRoot: string): string { return join(minecraftRoot, 'game-mashup-mario64'); }
+
+  async migrateLegacyInstance(minecraftRoot: string): Promise<void> {
+    const instance = this.instancePath(minecraftRoot);
+    if (await exists(join(instance, 'installation.json'))) return;
+    const legacy = join(this.dataRoot, 'minecraft-instances', 'mario64');
+    const receipt = await readJson<InstallReceipt>(join(legacy, 'installation.json'));
+    if (!receipt || receipt.minecraftRoot !== minecraftRoot ||
+        !/^[\w.+-]+$/.test(receipt.installedVersion ?? '') ||
+        !receipt.fabricApiFile || basename(receipt.fabricApiFile) !== receipt.fabricApiFile) return;
+    await cp(legacy, instance, { recursive: true, force: false, errorOnExist: false });
+    await this.writeModList(instance, `mario64mc-${receipt.installedVersion}.jar`, receipt.fabricApiFile);
+    await atomicJson(join(instance, 'installation.json'), { ...receipt, instancePath: instance });
+  }
 
   async validateRom(path: string): Promise<string> {
     if (!path.toLowerCase().endsWith('.z64')) throw new Error('Choose a .z64 Super Mario 64 USA ROM.');
@@ -158,6 +171,18 @@ export class MarioInstaller {
     const actual = await hashFile(path, 'sha1');
     if (actual !== ROM_SHA1) throw new Error(`This does not appear to be the supported Super Mario 64 US ROM.\nExpected: ${ROM_SHA1}\nDetected: ${actual}`);
     return actual;
+  }
+
+  async syncRom(minecraftRoot: string, romPath: string): Promise<boolean> {
+    const instance = this.instancePath(minecraftRoot);
+    if (!await exists(join(instance, 'installation.json'))) return false;
+    await this.validateRom(romPath);
+    const target = join(instance, 'config', 'mario64', 'baserom.us.z64');
+    if (await exists(target) && await hashFile(target, 'sha1') === ROM_SHA1) return true;
+    await mkdir(dirname(target), { recursive: true });
+    await copyFile(romPath, target);
+    if (await hashFile(target, 'sha1') !== ROM_SHA1) throw new Error('Copied ROM failed checksum verification.');
+    return true;
   }
 
   async inspectTools(options: Pick<InstallOptions, 'toolchainBinPath' | 'pythonBinPath' | 'javaBinPath'>): Promise<BuildToolStatus> {
@@ -219,7 +244,8 @@ export class MarioInstaller {
     const built = join(sourceDir, 'build', 'libsm64', 'dist', nativeLibraryName());
     if (!await exists(built)) throw new Error(`Build succeeded but ${built} was not found.`);
 
-    const instance = this.instancePath();
+    await this.migrateLegacyInstance(options.minecraftRoot);
+    const instance = this.instancePath(options.minecraftRoot);
     const modsDir = join(instance, 'mods');
     const configDir = join(instance, 'config', 'mario64');
     await mkdir(modsDir, { recursive: true });
@@ -242,7 +268,7 @@ export class MarioInstaller {
     }
     await copyFile(modCache, join(modsDir, mod.name));
     await copyFile(apiCache, join(modsDir, apiFile.filename));
-    await this.writeModList(mod.name, apiFile.filename);
+    await this.writeModList(instance, mod.name, apiFile.filename);
     await copyFile(options.romPath, join(configDir, 'baserom.us.z64'));
     // Upstream's MarioController currently opens this exact path on every OS.
     await copyFile(built, join(configDir, 'sm64.dll'));
@@ -262,7 +288,7 @@ export class MarioInstaller {
   }
 
   async verify(minecraftRoot: string): Promise<InstallationCheck[]> {
-    const instance = this.instancePath();
+    const instance = this.instancePath(minecraftRoot);
     const receipt = await readJson<InstallReceipt>(join(instance, 'installation.json'));
     const version = receipt?.fabricLoader && /^\d+\.\d+\.\d+$/.test(receipt.fabricLoader) ? managedFabricVersionId(receipt.fabricLoader) : undefined;
     const profileFiles = ['launcher_profiles.json', 'launcher_profiles_microsoft_store.json'];
@@ -277,7 +303,7 @@ export class MarioInstaller {
       await exists(join(minecraftRoot, 'versions', version!, `${version}.jar`));
     const modName = receipt?.installedVersion && /^[\w.+-]+$/.test(receipt.installedVersion) ? `mario64mc-${receipt.installedVersion}.jar` : undefined;
     const modList = modName && receipt?.fabricApiFile && basename(receipt.fabricApiFile) === receipt.fabricApiFile
-      ? this.modListContents(modName, receipt.fabricApiFile) : undefined;
+      ? this.modListContents(instance, modName, receipt.fabricApiFile) : undefined;
     const modListOk = !!modList && await readFile(join(instance, 'mashup-mods.txt'), 'utf8').then(contents => contents === modList, () => false);
     const modPath = receipt?.installedVersion && /^[\w.+-]+$/.test(receipt.installedVersion) ? join(instance, 'mods', `mario64mc-${receipt.installedVersion}.jar`) : undefined;
     const safeHash = async (path: string, algorithm: 'sha1' | 'sha256' | 'sha512') => {
@@ -306,14 +332,16 @@ export class MarioInstaller {
   }
 
   async selectProfile(minecraftRoot: string): Promise<void> {
+    await this.migrateLegacyInstance(minecraftRoot);
     const checks = await this.verify(minecraftRoot);
     if (checks.some(item => !item.ok && item.id !== 'fabric-profile')) throw new Error('Installation assets are not ready to play.');
     await requireMinecraftLauncherClosed();
-    const receipt = await readJson<InstallReceipt>(join(this.instancePath(), 'installation.json'));
+    const instance = this.instancePath(minecraftRoot);
+    const receipt = await readJson<InstallReceipt>(join(instance, 'installation.json'));
     if (!receipt?.fabricLoader) throw new Error('Fabric Loader receipt is missing.');
     if (!receipt.installedVersion || !/^[\w.+-]+$/.test(receipt.installedVersion) ||
         !receipt.fabricApiFile || basename(receipt.fabricApiFile) !== receipt.fabricApiFile) throw new Error('Installed mod filenames are invalid.');
-    await this.writeModList(`mario64mc-${receipt.installedVersion}.jar`, receipt.fabricApiFile);
+    await this.writeModList(instance, `mario64mc-${receipt.installedVersion}.jar`, receipt.fabricApiFile);
     await this.writeProfile(minecraftRoot, receipt.fabricLoader);
     if ((await this.verify(minecraftRoot)).some(item => !item.ok)) throw new Error('Managed profile repair failed.');
     for (const name of ['launcher_profiles_microsoft_store.json', 'launcher_profiles.json']) {
@@ -401,18 +429,18 @@ export class MarioInstaller {
     data.profiles ??= {};
     const version = await createManagedFabricVersion(minecraftRoot, loader);
     data.profiles[PROFILE_ID] = {
-      ...data.profiles[PROFILE_ID], name: 'Mario 64 in Minecraft', type: 'custom', gameDir: this.instancePath(),
+      ...data.profiles[PROFILE_ID], name: 'Mario 64 in Minecraft', type: 'custom', gameDir: this.instancePath(minecraftRoot),
       javaArgs: cleanProfileJvmArguments(data.profiles[PROFILE_ID]?.javaArgs),
       lastVersionId: version, created: data.profiles[PROFILE_ID]?.created ?? new Date().toISOString(), lastUsed: new Date().toISOString(),
     };
     await atomicJson(path, data);
   }
 
-  private modListContents(modName: string, apiName: string): string {
-    return `${join(this.instancePath(), 'mods', modName)}\n${join(this.instancePath(), 'mods', apiName)}\n`;
+  private modListContents(instance: string, modName: string, apiName: string): string {
+    return `${join(instance, 'mods', modName)}\n${join(instance, 'mods', apiName)}\n`;
   }
 
-  private async writeModList(modName: string, apiName: string): Promise<void> {
-    await writeFile(join(this.instancePath(), 'mashup-mods.txt'), this.modListContents(modName, apiName), 'utf8');
+  private async writeModList(instance: string, modName: string, apiName: string): Promise<void> {
+    await writeFile(join(instance, 'mashup-mods.txt'), this.modListContents(instance, modName, apiName), 'utf8');
   }
 }

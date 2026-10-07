@@ -47,7 +47,10 @@ async function snapshot() {
     || mcStatus.installations.find(item => item.version === '1.21.4')?.rootPath
     || mcStatus.installations[0]?.rootPath
     || mcStatus.rootDirectories[0];
+  if (root) await installer().migrateLegacyInstance(root);
   const checks = root ? await installer().verify(root) : [];
+  const romRepairable = romValid && checks.some(item => !item.ok && (item.id === 'rom' || item.id === 'rom-hash')) &&
+    checks.every(item => item.ok || item.id === 'rom' || item.id === 'rom-hash' || item.id === 'fabric-profile');
   const installedRomValid = checks.find(item => item.id === 'rom-hash')?.ok ?? false;
   const gameRequirements = resolveGameRequirements(registry, 'mario64-in-minecraft', installations, { 'super-mario-64': romValid || installedRomValid });
   return {
@@ -59,6 +62,7 @@ async function snapshot() {
     buildTools,
     managedToolsAvailable: process.platform === 'win32' && process.arch === 'x64',
     ready: checks.length > 0 && checks.every(item => item.ok),
+    romRepairable,
     profileRepairable: checks.length > 0 && checks.some(item => item.id === 'fabric-profile' && !item.ok) &&
       checks.every(item => item.id === 'fabric-profile' || item.ok),
   };
@@ -96,6 +100,8 @@ function registerIpc(): void {
     if (!result.canceled) {
       await installer().validateRom(result.filePaths[0]);
       await updateSettings({ romPath: result.filePaths[0] });
+      const state = await snapshot();
+      if (state.minecraftRoot) await installer().syncRom(state.minecraftRoot, result.filePaths[0]);
     }
     return await snapshot();
   });
@@ -134,10 +140,14 @@ function registerIpc(): void {
     return { receipt, state: await snapshot() };
   }));
   ipcMain.handle('play', () => withBusy(async () => {
-    const state = await snapshot();
+    let state = await snapshot();
+    if (state.romRepairable && state.minecraftRoot && state.romPath) {
+      await installer().syncRom(state.minecraftRoot, state.romPath);
+      state = await snapshot();
+    }
     if ((!state.ready && !state.profileRepairable) || !state.minecraftRoot) throw new Error('Installation is not ready.');
     await installer().selectProfile(state.minecraftRoot);
-    const receipt = await readJson<InstallReceipt>(join(installer().instancePath(), 'installation.json'));
+    const receipt = await readJson<InstallReceipt>(join(installer().instancePath(state.minecraftRoot), 'installation.json'));
     await openMinecraftLauncher();
     return `Minecraft Launcher opened. Select “Mario 64 in Minecraft” with version “${managedFabricVersionId(receipt!.fabricLoader)}” in its bottom-left installation dropdown, then press Play. The official Launcher may ignore the saved profile selection.`;
   }));
