@@ -3,7 +3,7 @@ import { join, relative, resolve, sep } from 'node:path';
 import { download, getJson } from './download';
 import { exists } from './fs';
 import { commandWorks, run, type LogHandler } from './process';
-import { path7za } from '7zip-bin';
+import { extractorPath } from './archive';
 
 const PYTHON = {
   name: 'python-3.13.14',
@@ -28,11 +28,6 @@ export function selectJavaPackage(assets: AdoptiumAsset[]): { link: string; chec
       /^OpenJDK21U-jre_x64_windows_hotspot_[\w.+-]+\.zip$/.test(candidate.name)) return candidate as { link: string; checksum: string; name: string };
   }
   return undefined;
-}
-
-function extractorPath(): string {
-  // Electron places executable dependencies outside its read-only asar archive.
-  return path7za.replace(`${sep}app.asar${sep}`, `${sep}app.asar.unpacked${sep}`);
 }
 
 async function findBin(root: string, executable: string): Promise<string | undefined> {
