@@ -36,6 +36,7 @@ async function snapshot() {
   const installations = await discoverGames(registry, [minecraft, new SteamProvider(), new CrossOverSteamProvider(), new ManualProvider(settingsPath())]);
   const mcStatus = await minecraft.inspect();
   const saved = await settings();
+  const buildTools = await installer().inspectTools(saved);
   let romValid = false;
   let romError = '';
   if (saved.romPath) {
@@ -55,6 +56,7 @@ async function snapshot() {
     manualPaths: saved.manualPaths,
     minecraftRoot: root,
     checks,
+    buildTools,
     managedToolsAvailable: process.platform === 'win32' && process.arch === 'x64',
     ready: checks.length > 0 && checks.every(item => item.ok),
   };

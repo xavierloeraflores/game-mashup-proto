@@ -32,6 +32,8 @@ function render(data) {
   const mcDetail = minecraft?.satisfied ? 'Java Edition 1.21.4 found' : minecraft?.installed ? 'Java Edition found, but version 1.21.4 is missing' : data.minecraft.bedrockDetected ? 'Minecraft was detected, but this mashup requires Minecraft: Java Edition.' : 'Minecraft Java Edition not found';
   row(requirementList, 'Minecraft: Java Edition 1.21.4', mcDetail, !!minecraft?.satisfied);
   row(requirementList, 'Super Mario 64 US ROM', data.installedRomValid ? 'Validated ROM in managed instance' : data.romValid ? 'Validated SHA-1; stays on this computer' : data.romError || 'Your own .z64 file is required', data.romValid || data.installedRomValid);
+  const missingTools = Object.entries(data.buildTools).filter(([, ready]) => !ready).map(([name]) => name);
+  row(requirementList, 'Build tools', missingTools.length ? `Missing: ${missingTools.join(', ')}` : 'Git, Bash, Python, GCC/Make, and Java 21 ready', missingTools.length === 0);
   const checkNames = ['fabric-profile', 'fabric-api', 'mario-mod', 'native'];
   for (const id of checkNames) {
     const check = data.checks.find(item => item.id === id);

@@ -26,9 +26,11 @@ export interface BuildReview {
   scriptSha256: string;
   scriptPath: string;
   script: string;
-  buildTools: { git: boolean; python: boolean; bash: boolean; compiler: boolean; java: boolean };
+  buildTools: BuildToolStatus;
   romSha1: string;
 }
+
+export interface BuildToolStatus { git: boolean; python: boolean; bash: boolean; compiler: boolean; java: boolean }
 
 export interface InstallOptions {
   minecraftRoot: string;
@@ -95,6 +97,18 @@ export class MarioInstaller {
     return actual;
   }
 
+  async inspectTools(options: Pick<InstallOptions, 'toolchainBinPath' | 'pythonBinPath' | 'javaBinPath'>): Promise<BuildToolStatus> {
+    const env = this.buildEnvironment(options);
+    const bash = await this.bashPath();
+    return {
+      git: await commandWorks('git'),
+      python: await commandWorks('python', ['-c', 'import sys; assert sys.version_info.major == 3'], env) || await commandWorks('python3', ['-c', 'import sys; assert sys.version_info.major == 3'], env),
+      bash: !!bash,
+      compiler: await this.bashCommandWorks(bash, 'command -v gcc >/dev/null && command -v make >/dev/null', env),
+      java: await this.java21Works(env),
+    };
+  }
+
   async prepare(options: InstallOptions): Promise<BuildReview> {
     await this.requireMinecraftVersion(options.minecraftRoot);
     const romSha1 = await this.validateRom(options.romPath);
@@ -110,15 +124,7 @@ export class MarioInstaller {
     const scriptPath = join(sourceDir, 'scripts', 'build-libsm64.sh');
     const script = await readFile(scriptPath, 'utf8');
     const scriptSha256 = createHash('sha256').update(script).digest('hex');
-    const env = this.buildEnvironment(options);
-    const bash = await this.bashPath();
-    const buildTools = {
-      git: await commandWorks('git'),
-      python: await commandWorks('python', ['-c', 'import sys; assert sys.version_info.major == 3'], env) || await commandWorks('python3', ['-c', 'import sys; assert sys.version_info.major == 3'], env),
-      bash: !!bash,
-      compiler: await this.bashCommandWorks(bash, 'command -v gcc >/dev/null && command -v make >/dev/null', env),
-      java: await this.java21Works(env),
-    };
+    const buildTools = await this.inspectTools(options);
     return { source: `https://github.com/${REPOSITORY}`, releaseTag: release.tag_name, sourceCommit, scriptSha256, scriptPath, script, buildTools, romSha1 };
   }
 
