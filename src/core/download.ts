@@ -12,6 +12,12 @@ export async function getJson<T>(url: string): Promise<T> {
   return await response.json() as T;
 }
 
+export async function getText(url: string): Promise<string> {
+  const response = await fetch(url, { headers: { 'User-Agent': 'GameMashupLauncher/0.1', Accept: 'text/plain' } });
+  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+  return await response.text();
+}
+
 export async function hashFile(path: string, algorithm: 'sha1' | 'sha256' | 'sha512'): Promise<string> {
   const hash = createHash(algorithm);
   await pipeline(createReadStream(path), hash);

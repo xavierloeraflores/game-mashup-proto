@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process';
 import { platform } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { strFromU8, unzipSync } from 'fflate';
-import { download, getJson, hashFile } from './download';
+import { download, getJson, getText, hashFile } from './download';
 import { exists, isDirectory, readJson } from './fs';
 import { commandWorks, run, type LogHandler } from './process';
 
@@ -52,6 +52,7 @@ export interface InstallReceipt {
   fabricLoader: string;
   fabricApi: string;
   fabricApiFile: string;
+  fabricApiSha512: string;
   sourceCommit: string;
   instancePath: string;
   minecraftRoot: string;
@@ -81,6 +82,10 @@ export function javaMajorVersion(output: string): number | undefined {
 
 export function githubAssetSha256(digest?: string): string | undefined {
   return digest?.match(/^sha256:([a-f0-9]{64})$/i)?.[1].toLowerCase();
+}
+
+export function fabricInstallerSha256(sidecar: string): string | undefined {
+  return sidecar.trim().match(/^[a-f0-9]{64}$/i)?.[0].toLowerCase();
 }
 
 export async function validateMarioJar(path: string, expectedVersion: string): Promise<void> {
@@ -191,8 +196,9 @@ export class MarioInstaller {
     const apiFile = api?.files.find(file => file.primary && file.filename.endsWith('.jar')) ?? api?.files.find(file => file.filename.endsWith('.jar'));
     if (!api || !apiFile) throw new Error('No Fabric API JAR found for Minecraft 1.21.4.');
     if (basename(apiFile.filename) !== apiFile.filename) throw new Error('Unexpected Fabric API filename.');
+    if (!/^[a-f0-9]{128}$/i.test(apiFile.hashes.sha512 ?? '')) throw new Error('Fabric API release has no valid SHA-512 checksum.');
     const apiCache = join(this.dataRoot, 'cache', 'mods', apiFile.filename);
-    await download(apiFile.url, apiCache, apiFile.hashes.sha512 ? { algorithm: 'sha512', value: apiFile.hashes.sha512 } : undefined);
+    await download(apiFile.url, apiCache, { algorithm: 'sha512', value: apiFile.hashes.sha512! });
     const prior = await readJson<InstallReceipt>(join(instance, 'installation.json'));
     for (const oldName of [prior?.installedVersion ? `mario64mc-${prior.installedVersion}.jar` : undefined, prior?.fabricApiFile]) {
       if (oldName && oldName !== mod.name && oldName !== apiFile.filename && /^(mario64mc|fabric-api)-[\w.+-]+\.jar$/i.test(oldName)) {
@@ -207,7 +213,8 @@ export class MarioInstaller {
     const receipt: InstallReceipt = {
       repository: REPOSITORY, releaseTag: release.tag_name, downloadUrl: mod.browser_download_url,
       downloadDate: new Date().toISOString(), installedVersion: modVersion,
-      sha256: modHash, fabricLoader: loader, fabricApi: api.version_number, fabricApiFile: apiFile.filename, sourceCommit: review.sourceCommit,
+      sha256: modHash, fabricLoader: loader, fabricApi: api.version_number, fabricApiFile: apiFile.filename,
+      fabricApiSha512: apiFile.hashes.sha512!.toLowerCase(), sourceCommit: review.sourceCommit,
       instancePath: instance, minecraftRoot: options.minecraftRoot, profileId: PROFILE_ID,
     };
     await atomicJson(join(instance, 'installation.json'), receipt);
@@ -228,14 +235,16 @@ export class MarioInstaller {
       if (data?.profiles?.[PROFILE_ID]?.gameDir === instance && data.profiles[PROFILE_ID].lastVersionId === version) profileFound = true;
     }
     const modPath = receipt?.installedVersion && /^[\w.+-]+$/.test(receipt.installedVersion) ? join(instance, 'mods', `mario64mc-${receipt.installedVersion}.jar`) : undefined;
-    const safeHash = async (path: string, algorithm: 'sha1' | 'sha256') => {
+    const safeHash = async (path: string, algorithm: 'sha1' | 'sha256' | 'sha512') => {
       try { return await hashFile(path, algorithm); } catch { return undefined; }
     };
     let modOk = !!modPath && await exists(modPath) && await safeHash(modPath, 'sha256') === receipt?.sha256;
     if (modOk && modPath && receipt?.installedVersion) {
       try { await validateMarioJar(modPath, receipt.installedVersion); } catch { modOk = false; }
     }
-    const apiOk = !!receipt?.fabricApiFile && basename(receipt.fabricApiFile) === receipt.fabricApiFile && await exists(join(instance, 'mods', receipt.fabricApiFile));
+    const apiOk = !!receipt?.fabricApiFile && basename(receipt.fabricApiFile) === receipt.fabricApiFile &&
+      /^[a-f0-9]{128}$/i.test(receipt.fabricApiSha512 ?? '') &&
+      await safeHash(join(instance, 'mods', receipt.fabricApiFile), 'sha512') === receipt.fabricApiSha512.toLowerCase();
     const romPath = join(instance, 'config', 'mario64', 'baserom.us.z64');
     const romOk = await exists(romPath) && await safeHash(romPath, 'sha1') === ROM_SHA1;
     return [
@@ -243,7 +252,7 @@ export class MarioInstaller {
       { id: 'minecraft-version', ok: await exists(join(minecraftRoot, 'versions', MINECRAFT_VERSION, `${MINECRAFT_VERSION}.jar`)), detail: `Minecraft Java ${MINECRAFT_VERSION} exists` },
       { id: 'instance', ok: await isDirectory(instance), detail: 'Managed instance exists' },
       { id: 'fabric-profile', ok: !!version && versionAtLeast(receipt?.fabricLoader ?? '0', '0.16.10') && profileFound && await exists(join(minecraftRoot, 'versions', version, `${version}.json`)), detail: 'Fabric profile/config exists' },
-      { id: 'fabric-api', ok: apiOk, detail: 'Fabric API JAR exists' },
+      { id: 'fabric-api', ok: apiOk, detail: 'Fabric API JAR matches recorded SHA-512' },
       { id: 'mario-mod', ok: modOk, detail: 'mario64mc JAR matches SHA-256 and Minecraft metadata' },
       { id: 'native', ok: await exists(join(instance, 'config', 'mario64', nativeLibraryName())), detail: 'sm64 native library exists' },
       { id: 'rom', ok: await exists(romPath), detail: 'baserom.us.z64 exists' },
@@ -320,7 +329,9 @@ export class MarioInstaller {
     const installer = installers.find(item => item.stable);
     if (!installer || !installer.url.startsWith('https://maven.fabricmc.net/')) throw new Error('No official Fabric installer available.');
     const installerPath = join(this.dataRoot, 'cache', 'tools', `fabric-installer-${installer.version}.jar`);
-    await download(installer.url, installerPath);
+    const installerHash = fabricInstallerSha256(await getText(`${installer.url}.sha256`));
+    if (!installerHash) throw new Error('Official Fabric installer has no valid SHA-256 checksum.');
+    await download(installer.url, installerPath, { algorithm: 'sha256', value: installerHash });
     const args = ['-jar', installerPath, 'client', '-dir', minecraftRoot, '-mcversion', MINECRAFT_VERSION, '-loader', loader];
     if (platform() === 'win32') {
       args.push('-launcher', await exists(join(minecraftRoot, 'launcher_profiles_microsoft_store.json')) ? 'microsoft_store' : 'win32');

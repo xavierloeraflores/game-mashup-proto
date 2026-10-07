@@ -1,15 +1,21 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { strToU8, zipSync } from 'fflate';
-import { MarioInstaller, PROFILE_ID, ROM_SHA1, githubAssetSha256, javaMajorVersion, validateMarioJar } from '../core/mario';
+import { MarioInstaller, PROFILE_ID, ROM_SHA1, fabricInstallerSha256, githubAssetSha256, javaMajorVersion, validateMarioJar } from '../core/mario';
 
 test('GitHub release JAR requires a complete SHA-256 digest', () => {
   assert.equal(githubAssetSha256(`sha256:${'A'.repeat(64)}`), 'a'.repeat(64));
   assert.equal(githubAssetSha256('sha256:bad'), undefined);
   assert.equal(githubAssetSha256(`sha1:${'a'.repeat(40)}`), undefined);
+});
+
+test('Fabric installer requires a SHA-256 Maven sidecar', () => {
+  assert.equal(fabricInstallerSha256(` ${'B'.repeat(64)}\n`), 'b'.repeat(64));
+  assert.equal(fabricInstallerSha256('not-a-digest'), undefined);
 });
 
 test('Mario JAR metadata must match its release and Minecraft 1.21.4', async () => {
@@ -61,15 +67,19 @@ test('installation verification checks the isolated profile and ROM contents', a
     await writeFile(join(minecraft, 'versions', version, `${version}.json`), '{}');
     await writeFile(join(minecraft, 'versions', '1.21.4', '1.21.4.jar'), 'vanilla jar');
     await writeFile(join(minecraft, 'launcher_profiles.json'), JSON.stringify({ profiles: { [PROFILE_ID]: { gameDir: instance, lastVersionId: version } } }));
-    await writeFile(join(instance, 'installation.json'), JSON.stringify({ fabricLoader: '0.16.10', fabricApiFile: 'fabric-api-0.119.4+1.21.4.jar', installedVersion: '0.1.0', sha256: 'wrong' }));
+    const apiHash = createHash('sha512').update('fake jar').digest('hex');
+    await writeFile(join(instance, 'installation.json'), JSON.stringify({ fabricLoader: '0.16.10', fabricApiFile: 'fabric-api-0.119.4+1.21.4.jar', fabricApiSha512: apiHash, installedVersion: '0.1.0', sha256: 'wrong' }));
     await writeFile(join(instance, 'mods', 'fabric-api-0.119.4+1.21.4.jar'), 'fake jar');
     await writeFile(join(instance, 'mods', 'mario64mc-0.1.0.jar'), 'fake jar');
     await writeFile(join(instance, 'config', 'mario64', process.platform === 'win32' ? 'sm64.dll' : process.platform === 'darwin' ? 'libsm64.dylib' : 'libsm64.so'), 'fake library');
     await writeFile(join(instance, 'config', 'mario64', 'baserom.us.z64'), 'invalid rom');
     const checks = await installer.verify(minecraft);
     assert.equal(checks.find(item => item.id === 'fabric-profile')?.ok, true);
+    assert.equal(checks.find(item => item.id === 'fabric-api')?.ok, true);
     assert.equal(checks.find(item => item.id === 'rom')?.ok, true);
     assert.equal(checks.find(item => item.id === 'rom-hash')?.ok, false);
+    await writeFile(join(instance, 'mods', 'fabric-api-0.119.4+1.21.4.jar'), 'corrupt jar');
+    assert.equal((await installer.verify(minecraft)).find(item => item.id === 'fabric-api')?.ok, false);
     await assert.rejects(() => installer.selectProfile(minecraft), /not ready/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
