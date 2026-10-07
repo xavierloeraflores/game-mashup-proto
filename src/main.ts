@@ -76,6 +76,10 @@ async function withBusy<T>(operation: () => Promise<T>): Promise<T> {
 
 function registerIpc(): void {
   ipcMain.handle('snapshot', snapshot);
+  ipcMain.handle('open-minecraft-launcher', async () => {
+    await openMinecraftLauncher();
+    return 'Minecraft Launcher opened. Install and run Java Edition 1.21.4, then rescan this app.';
+  });
   ipcMain.handle('choose-minecraft', async () => {
     const path = await chooseDirectory();
     if (path) {
@@ -131,23 +135,40 @@ function registerIpc(): void {
     const state = await snapshot();
     if (!state.ready || !state.minecraftRoot) throw new Error('Installation is not ready.');
     await installer().selectProfile(state.minecraftRoot);
-    const launcher = await launcherExecutable();
-    if (launcher) {
-      const child = spawn(launcher, [], { detached: true, stdio: 'ignore', windowsHide: true });
-      child.unref();
-    } else if (process.platform === 'win32') {
-      // The minecraft: URI belongs to Bedrock on some machines. Open the verified Launcher package instead.
-      const child = spawn('explorer.exe', ['shell:AppsFolder\\Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft'], { detached: true, stdio: 'ignore', windowsHide: true });
-      child.unref();
-    } else if (process.platform === 'darwin') {
-      const child = spawn('open', ['-a', 'Minecraft'], { detached: true, stdio: 'ignore' });
-      child.unref();
-    } else {
-      throw new Error('Minecraft Launcher executable not found. Open Minecraft Launcher and select Mario 64 in Minecraft.');
-    }
+    await openMinecraftLauncher();
     return 'Minecraft Launcher opened with the Mario 64 profile selected. Press Play in Minecraft Launcher.';
   }));
   ipcMain.handle('open-source', async () => { await shell.openExternal('https://github.com/Zckyy/mario64-in-minecraft'); });
+}
+
+async function openMinecraftLauncher(): Promise<void> {
+  const launcher = await launcherExecutable();
+  if (launcher) {
+    await launchDetached(launcher, []);
+    return;
+  }
+  if (process.platform === 'win32') {
+    const { exists } = await import('./core/fs');
+    const packagePath = join(process.env.LOCALAPPDATA ?? '', 'Packages', 'Microsoft.4297127D64EC6_8wekyb3d8bbwe');
+    if (await exists(packagePath)) {
+      // The minecraft: URI belongs to Bedrock on some machines. Open the verified Launcher package instead.
+      await launchDetached('explorer.exe', ['shell:AppsFolder\\Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft']);
+      return;
+    }
+  }
+  if (process.platform === 'darwin') {
+    await launchDetached('open', ['-a', 'Minecraft']);
+    return;
+  }
+  throw new Error('Minecraft Launcher executable not found. Install the official Minecraft Launcher first.');
+}
+
+async function launchDetached(command: string, args: string[]): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, { detached: true, stdio: 'ignore', windowsHide: true });
+    child.once('error', reject);
+    child.once('spawn', () => { child.unref(); resolve(); });
+  });
 }
 
 async function launcherExecutable(): Promise<string | undefined> {

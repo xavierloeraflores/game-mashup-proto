@@ -8,7 +8,7 @@
 
 ## Test procedure
 
-1. Start the launcher and verify that Minecraft Launcher and Java Edition appear as separate discovery rows. If Java 1.21.4 is installed in a custom location, use **Choose Minecraft directory** to select its root game directory, the one containing `versions/`.
+1. Start the launcher and verify that Minecraft Launcher and Java Edition appear as separate discovery rows. If Java 1.21.4 is missing, use **Open Minecraft Launcher** to install and run that version through the official launcher. If Java 1.21.4 is installed in a custom location, use **Choose Minecraft directory** to select its root game directory, the one containing `versions/`.
 2. Confirm the 2009 Modern Warfare 2 installation is identified by Steam AppID `10180`. A Call of Duty HQ installation alone must not appear as Modern Warfare II (2022).
 3. Choose the locally owned SM64 ROM. An unsupported checksum must display the expected and detected SHA-1 values; a supported one is marked validated.
 4. Select **Install mashup**. Review the exact upstream script, release tag, and commit. Resolve any missing build tools (or use **Download build tools** on Windows x64), then choose **Run reviewed script**.

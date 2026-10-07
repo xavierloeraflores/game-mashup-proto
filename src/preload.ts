@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('launcher', {
   snapshot: () => ipcRenderer.invoke('snapshot'),
+  openMinecraftLauncher: () => ipcRenderer.invoke('open-minecraft-launcher'),
   chooseMinecraft: () => ipcRenderer.invoke('choose-minecraft'),
   chooseRom: () => ipcRenderer.invoke('choose-rom'),
   chooseToolchain: () => ipcRenderer.invoke('choose-toolchain'),

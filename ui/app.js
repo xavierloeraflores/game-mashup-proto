@@ -69,6 +69,7 @@ function render(data) {
   }
 
   $('play').disabled = !data.ready;
+  $('open-minecraft').disabled = !data.minecraft.launcherInstalled;
   $('managed-tools').hidden = !data.managedToolsAvailable;
   const badge = $('ready-badge');
   badge.textContent = data.ready ? 'READY TO PLAY' : 'SETUP NEEDED';
@@ -91,6 +92,7 @@ window.launcher.onLog(line => {
 });
 
 $('refresh').addEventListener('click', () => action(refresh));
+$('open-minecraft').addEventListener('click', () => action(async () => notice(await window.launcher.openMinecraftLauncher())));
 $('minecraft-path').addEventListener('click', () => action(async () => render(await window.launcher.chooseMinecraft())));
 $('rom-path').addEventListener('click', () => action(async () => render(await window.launcher.chooseRom())));
 $('toolchain-path').addEventListener('click', () => action(async () => render(await window.launcher.chooseToolchain())));
