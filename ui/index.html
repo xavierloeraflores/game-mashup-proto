@@ -10,25 +10,41 @@
 </head>
 <body>
   <div class="shell">
-    <aside class="sidebar">
-      <div class="brand"><div class="brand-icon">✳</div><div><strong>GAME<br>MASHUP</strong><small>LAUNCHER / PROTOTYPE</small></div></div>
-      <div class="nav-label">LIBRARY</div>
-      <button class="nav-item active" type="button">⌂ <span>Mashups</span></button>
-      <div class="sidebar-bottom"><div class="connection-dot"></div><span>Local-only assets</span></div>
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="brand"><div class="brand-icon">✳</div><div><strong>GAME<br>MASHUP</strong><small>LAUNCHER</small></div></div>
+      <div class="nav-label">EXPLORE</div>
+      <nav class="navigation" aria-label="Mashup pages">
+        <a class="nav-item" href="#library" data-nav="library"><span class="nav-symbol" aria-hidden="true">⌂</span> Library</a>
+        <a class="nav-item" href="#mario" data-nav="mario"><span class="nav-symbol" aria-hidden="true">M</span> Mario 64 in Minecraft</a>
+        <a class="nav-item" href="#mw2" data-nav="mw2"><span class="nav-symbol" aria-hidden="true">▣</span> Minecraft in MW2</a>
+      </nav>
+      <div class="sidebar-bottom"><div class="connection-dot"></div><span>Local game files</span></div>
     </aside>
-    <main>
-      <header><div><div class="eyebrow">YOUR MASHUP LIBRARY</div><h1>Play across worlds.</h1><p>Discover installed games, prepare isolated instances, and bring them together.</p></div><button id="refresh" class="button ghost" type="button">↻ &nbsp; Rescan</button></header>
+    <main id="main">
+      <div class="topbar"><span id="page-label">LIBRARY</span><button id="refresh" class="button ghost" type="button">↻ Rescan games</button></div>
       <div id="notice" role="status" aria-live="polite"></div>
-      <section class="hero" aria-labelledby="mario-title">
-        <div class="hero-art" aria-hidden="true"><div class="block one"></div><div class="block two"></div><div class="block three"></div><div class="orb">M</div></div>
-        <div class="hero-content"><div class="pill">FEATURED INTEGRATION</div><h2 id="mario-title">Mario 64 <em>in</em> Minecraft</h2><p>Real SM64 movement inside a Minecraft Java world. Built from upstream source, powered by your own ROM.</p><div class="hero-meta"><span>MINECRAFT JAVA 1.21.4</span><span>FABRIC</span><span>WINDOWS / MAC / LINUX CLIENT</span></div><div class="actions"><button id="install" class="button primary" type="button">Install mashup <span>↗</span></button><button id="play" class="button secondary" type="button" disabled>Play <span>▶</span></button><button id="source" class="button link" type="button">Upstream project ↗</button></div></div>
+
+      <section class="page" id="page-library" aria-labelledby="library-title">
+        <header class="page-header"><div><div class="eyebrow">YOUR MASHUP LIBRARY</div><h1 id="library-title">Choose a world to play.</h1><p>Pick a mashup to see what it needs, install it, and launch it.</p></div></header>
+        <div id="library-cards" class="library-grid"></div>
+        <section class="panel discovery"><div class="panel-heading"><div><div class="eyebrow">ON THIS COMPUTER</div><h2>Detected games</h2></div></div><div id="games" class="games"></div><p class="note">Rescan after installing a game. Minecraft Java Edition and its launcher are checked separately.</p></section>
       </section>
-      <div class="grid">
-        <section class="panel"><div class="panel-heading"><div><div class="eyebrow">INSTALL CHECKLIST</div><h3>Requirements</h3></div><span id="ready-badge" class="status-badge">Scanning</span></div><div id="requirements" class="requirements"></div><div class="panel-actions"><button id="open-minecraft" class="button subtle" type="button">Open Minecraft Launcher</button><button id="minecraft-path" class="button subtle" type="button">Choose Minecraft directory</button><button id="rom-path" class="button subtle" type="button">Choose ROM</button><button id="managed-tools" class="button subtle" type="button" hidden>Download build tools</button><button id="toolchain-path" class="button subtle" type="button">Compiler bin directory</button><button id="python-path" class="button subtle" type="button">Python directory</button><button id="java-path" class="button subtle" type="button">Java bin directory</button></div></section>
-        <section class="panel"><div class="panel-heading"><div><div class="eyebrow">ON THIS COMPUTER</div><h3>Game discovery</h3></div></div><div id="games" class="games"></div><div class="note">Minecraft Launcher and Java Edition are checked separately. Steam titles use AppIDs, not display names.</div></section>
-      </div>
-      <section class="panel more"><div class="panel-heading"><div><div class="eyebrow">MORE WORLDS</div><h3>Other mashups</h3></div></div><div id="future-mashups"></div></section>
-      <section class="panel log-panel"><div class="panel-heading"><div><div class="eyebrow">INSTALLER OUTPUT</div><h3>Activity</h3></div></div><pre id="log">Waiting for an installation.</pre></section>
+
+      <section class="page" id="page-mario" aria-labelledby="mario-title" hidden>
+        <a class="back-link" href="#library">← All mashups</a>
+        <section class="hero mario-hero"><div class="hero-art" aria-hidden="true"><div class="block one"></div><div class="block two"></div><div class="block three"></div><div class="orb">M</div></div><div class="hero-content"><div class="pill">MINECRAFT JAVA · FABRIC</div><h1 id="mario-title">Mario 64 <em>in</em> Minecraft</h1><p>Play as SM64 Mario in a Minecraft Java single-player world with your own ROM.</p><div class="hero-meta"><span>MINECRAFT JAVA 1.21.4</span><span>WINDOWS · MAC · LINUX CLIENT</span></div><div class="actions"><button id="install" class="button primary" type="button">Install mashup</button><button id="play" class="button secondary" type="button" disabled>Play ▶</button><button id="source" class="button link" type="button">Upstream project ↗</button></div></div></section>
+        <div class="detail-grid"><section class="panel"><div class="panel-heading"><div><div class="eyebrow">SETUP</div><h2>Install checklist</h2></div><span id="ready-badge" class="status-badge">Scanning</span></div><div id="requirements" class="requirements"></div><div class="panel-actions"><button id="open-minecraft" class="button subtle" type="button">Open Minecraft Launcher</button><button id="minecraft-path" class="button subtle" type="button">Choose Minecraft directory</button><button id="rom-path" class="button subtle" type="button">Choose ROM</button><button id="managed-tools" class="button subtle" type="button" hidden>Download build tools</button><button id="toolchain-path" class="button subtle" type="button">Compiler bin directory</button><button id="python-path" class="button subtle" type="button">Python directory</button><button id="java-path" class="button subtle" type="button">Java bin directory</button></div></section>
+          <section class="panel"><div class="eyebrow">AFTER INSTALLING</div><h2>How to play</h2><ol class="steps"><li>Choose <strong>Play</strong> above to open Minecraft Launcher and select the managed profile.</li><li>In Minecraft Launcher, select <strong>Mario 64 in Minecraft</strong> and press Play.</li><li>Enter a single-player world. Press <kbd>M</kbd> with chat closed to switch into Mario.</li></ol><p class="note">If the official launcher changes the selected installation, choose “Mario 64 in Minecraft” again from its bottom-left dropdown.</p></section></div>
+      </section>
+
+      <section class="page" id="page-mw2" aria-labelledby="mw2-title" hidden>
+        <a class="back-link" href="#library">← All mashups</a>
+        <section class="hero mw2-hero"><div class="mw2-art" aria-hidden="true"><div class="reticle"></div><div class="pixel pixel-a"></div><div class="pixel pixel-b"></div><div class="pixel pixel-c"></div></div><div class="hero-content"><div class="pill">MW2 (2009) · IW4L</div><h1 id="mw2-title">Minecraft world <em>in</em> MW2</h1><p>Fight through a generated Minecraft world with MW2 weapons.</p><div class="hero-meta"><span>STEAM MW2 MULTIPLAYER</span><span>WINDOWS X64</span></div><div class="actions"><button id="mw2-install" class="button primary" type="button" disabled>Install mashup</button><button id="mw2-play" class="button secondary" type="button" disabled>Play Minecraft world ▶</button><button id="mw2-source" class="button link" type="button">Upstream project ↗</button></div></div></section>
+        <div class="detail-grid"><section class="panel"><div class="panel-heading"><div><div class="eyebrow">SETUP</div><h2>Install checklist</h2></div><span id="mw2-badge" class="status-badge">Scanning</span></div><div id="mw2-requirements" class="requirements"></div><p id="mw2-next-step" class="note"></p></section>
+          <section class="panel"><div class="eyebrow">AFTER INSTALLING</div><h2>How to play</h2><ol class="steps"><li>Choose <strong>Play Minecraft world</strong> above to start IW4L.</li><li>On first launch, confirm your MW2 game folder and answer the Skate 3 ownership prompt.</li><li>Let the runtime download Minecraft assets, then choose a class in the Minecraft world.</li></ol><p class="note">The first launch needs an internet connection for Minecraft assets.</p></section></div>
+      </section>
+
+      <section class="panel log-panel"><div class="panel-heading"><div><div class="eyebrow">LAUNCHER OUTPUT</div><h2>Activity</h2></div></div><pre id="log">Waiting for an installation.</pre></section>
     </main>
   </div>
   <div id="review-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="review-title">

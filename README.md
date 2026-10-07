@@ -4,6 +4,8 @@ A cross-platform desktop prototype for discovering games and installing mashups 
 
 The library also installs [2010 Rust Rewrite Mashup](https://github.com/chasmlol/2010-rust-rewrite-mashup) for **Minecraft world in MW2 (2009)** on Windows x64. It detects a Steam MW2 multiplayer install (AppID 10180), downloads the pinned v0.4.0 release, verifies the release ZIP and executable SHA-256 hashes, and extracts an isolated IW4L runtime in the app's user-data directory. **Play Minecraft world** starts IW4L with `map minecraft:overworld`; on first launch, confirm the MW2 folder and choose whether you own Skate 3. The runtime downloads Minecraft assets from Mojang on first use. It does not require a local Minecraft install. The 2022 MWII title is tracked separately and is not used by this integration.
 
+The app opens to a library with a card for each mashup. Open **Mario 64 in Minecraft** or **Minecraft world in MW2 (2009)** for its own install checklist, Install and Play buttons, and play instructions. The sidebar and **All mashups** link move between pages; **Rescan games** refreshes discovery from any page.
+
 ## Development
 
 Requires Node.js 22 or newer.

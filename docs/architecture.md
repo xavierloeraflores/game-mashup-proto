@@ -4,7 +4,7 @@ The Electron renderer uses a sandboxed preload bridge. It cannot access the file
 
 ## Canonical IDs and providers
 
-`registry/games.yaml` lists canonical game IDs separately from store titles. `registry/mashups.yaml` declares status, dependencies, and an installer identifier. The loader validates referenced IDs. Adding an unavailable or experimental mashup needs only a new YAML entry; the desktop library renders those entries automatically. A runnable integration additionally needs an installer implementation for its declared `installer` ID.
+`registry/games.yaml` lists canonical game IDs separately from store titles. `registry/mashups.yaml` declares status, dependencies, and an installer identifier. The loader validates referenced IDs. Adding an unavailable or experimental mashup needs only a new YAML entry; the desktop library renders a placeholder card automatically. A runnable integration also needs an installer implementation, preload actions, and a detail page for its setup and play flow. The current detail pages are Mario 64 in Minecraft and Minecraft world in MW2 (2009).
 
 The `GameProvider` contract is `discover(game: GameMetadata): Promise<GameInstallation[]>`. Four providers exist:
 
@@ -28,7 +28,7 @@ Install performs these stages:
 5. Download the upstream release JAR and a matching [Fabric API](https://modrinth.com/mod/fabric-api/versions?g=1.21.4&l=fabric) release. Require GitHub's SHA-256 asset digest for the release JAR and Modrinth's SHA-512 file hash for Fabric API; compare each with the cache or download before installation. Read `fabric.mod.json` from the Mario JAR and require the expected mod ID, release version, and explicit Minecraft 1.21.4 compatibility. Verify both installed JAR hashes and the Mario metadata again before showing Ready to Play. Cache the files and place them in the managed instance. Copy the locally verified ROM and native library into `config/mario64`.
 6. Write `installation.json` recording repository, release tag, URL, date, installed version, local SHA-256, Fabric versions, source commit, instance path, and profile ID. Verify all required files, profile metadata, and ROM checksum before showing Ready to Play.
 
-The managed instance is under Electron's `app.getPath('userData')/minecraft-instances/mario64`. The installer writes only its own profile key and managed instance files; it does not clear unrelated Minecraft mods. Reinstalling into the same instance replaces its own files but leaves unrelated files present. The ROM source path is saved only in local launcher settings so it can be revalidated; the copied ROM stays in the managed instance. Neither is sent to a server.
+The managed instance is inside the selected Minecraft game directory at `game-mashup-mario64`. The installer writes only its own profile key and managed instance files; it does not clear unrelated Minecraft mods. Reinstalling into the same instance replaces its own files but leaves unrelated files present. The ROM source path is saved only in local launcher settings so it can be revalidated; the copied ROM stays in the managed instance. Neither is sent to a server.
 
 The upstream project says to enter a single-player world and press **M** to activate Mario. See its [installation and controls](https://github.com/Zckyy/mario64-in-minecraft#installation).
 
