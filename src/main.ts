@@ -114,7 +114,12 @@ function registerIpc(): void {
       const child = spawn(launcher, [], { detached: true, stdio: 'ignore', windowsHide: true });
       child.unref();
     } else if (process.platform === 'win32') {
-      await shell.openExternal('minecraft://');
+      // The minecraft: URI belongs to Bedrock on some machines. Open the verified Launcher package instead.
+      const child = spawn('explorer.exe', ['shell:AppsFolder\\Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft'], { detached: true, stdio: 'ignore', windowsHide: true });
+      child.unref();
+    } else if (process.platform === 'darwin') {
+      const child = spawn('open', ['-a', 'Minecraft'], { detached: true, stdio: 'ignore' });
+      child.unref();
     } else {
       throw new Error('Minecraft Launcher executable not found. Open Minecraft Launcher and select Mario 64 in Minecraft.');
     }

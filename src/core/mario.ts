@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { platform } from 'node:os';
 import { basename, dirname, join } from 'node:path';
@@ -44,6 +44,7 @@ export interface InstallReceipt {
   sha256: string;
   fabricLoader: string;
   fabricApi: string;
+  fabricApiFile: string;
   sourceCommit: string;
   instancePath: string;
   minecraftRoot: string;
@@ -88,6 +89,7 @@ export class MarioInstaller {
   async prepare(options: InstallOptions): Promise<BuildReview> {
     await this.requireMinecraftVersion(options.minecraftRoot);
     const romSha1 = await this.validateRom(options.romPath);
+    if (!await commandWorks('git')) throw new Error('Git is required to fetch the reviewed upstream source. Install Git, then retry.');
     const release = await this.release();
     const sourceDir = this.sourcePath(release.tag_name);
     if (!await isDirectory(join(sourceDir, '.git'))) {
@@ -138,7 +140,6 @@ export class MarioInstaller {
     if (!mod) throw new Error('Upstream release has no Fabric mod JAR.');
     const modCache = join(this.dataRoot, 'cache', 'mods', mod.name);
     const modHash = await download(mod.browser_download_url, modCache);
-    await copyFile(modCache, join(modsDir, mod.name));
 
     const apiVersions = await getJson<ModrinthVersion[]>(`https://api.modrinth.com/v2/project/fabric-api/version?game_versions=%5B%22${MINECRAFT_VERSION}%22%5D&loaders=%5B%22fabric%22%5D`);
     const api = apiVersions.find(item => item.version_type === 'release' && item.files.some(file => file.filename.endsWith('.jar')));
@@ -147,6 +148,13 @@ export class MarioInstaller {
     if (basename(apiFile.filename) !== apiFile.filename) throw new Error('Unexpected Fabric API filename.');
     const apiCache = join(this.dataRoot, 'cache', 'mods', apiFile.filename);
     await download(apiFile.url, apiCache, apiFile.hashes.sha512 ? { algorithm: 'sha512', value: apiFile.hashes.sha512 } : undefined);
+    const prior = await readJson<InstallReceipt>(join(instance, 'installation.json'));
+    for (const oldName of [prior?.installedVersion ? `mario64mc-${prior.installedVersion}.jar` : undefined, prior?.fabricApiFile]) {
+      if (oldName && oldName !== mod.name && oldName !== apiFile.filename && /^(mario64mc|fabric-api)-[\w.+-]+\.jar$/i.test(oldName)) {
+        await rm(join(modsDir, oldName), { force: true });
+      }
+    }
+    await copyFile(modCache, join(modsDir, mod.name));
     await copyFile(apiCache, join(modsDir, apiFile.filename));
     await copyFile(options.romPath, join(configDir, 'baserom.us.z64'));
     await copyFile(built, join(configDir, nativeLibraryName()));
@@ -154,7 +162,7 @@ export class MarioInstaller {
     const receipt: InstallReceipt = {
       repository: REPOSITORY, releaseTag: release.tag_name, downloadUrl: mod.browser_download_url,
       downloadDate: new Date().toISOString(), installedVersion: mod.name.replace(/^mario64mc-/, '').replace(/\.jar$/, ''),
-      sha256: modHash, fabricLoader: loader, fabricApi: api.version_number, sourceCommit: review.sourceCommit,
+      sha256: modHash, fabricLoader: loader, fabricApi: api.version_number, fabricApiFile: apiFile.filename, sourceCommit: review.sourceCommit,
       instancePath: instance, minecraftRoot: options.minecraftRoot, profileId: PROFILE_ID,
     };
     await atomicJson(join(instance, 'installation.json'), receipt);
@@ -174,15 +182,21 @@ export class MarioInstaller {
       const data = await readJson<{ profiles?: Record<string, { gameDir?: string; lastVersionId?: string }> }>(join(minecraftRoot, name));
       if (data?.profiles?.[PROFILE_ID]?.gameDir === instance && data.profiles[PROFILE_ID].lastVersionId === version) profileFound = true;
     }
-    const modFiles = await readdir(join(instance, 'mods')).catch(() => [] as string[]);
+    const modPath = receipt?.installedVersion && /^[\w.+-]+$/.test(receipt.installedVersion) ? join(instance, 'mods', `mario64mc-${receipt.installedVersion}.jar`) : undefined;
+    const safeHash = async (path: string, algorithm: 'sha1' | 'sha256') => {
+      try { return await hashFile(path, algorithm); } catch { return undefined; }
+    };
+    const modOk = !!modPath && await exists(modPath) && await safeHash(modPath, 'sha256') === receipt?.sha256;
+    const apiOk = !!receipt?.fabricApiFile && basename(receipt.fabricApiFile) === receipt.fabricApiFile && await exists(join(instance, 'mods', receipt.fabricApiFile));
     const romPath = join(instance, 'config', 'mario64', 'baserom.us.z64');
-    const romOk = await exists(romPath) && await hashFile(romPath, 'sha1') === ROM_SHA1;
+    const romOk = await exists(romPath) && await safeHash(romPath, 'sha1') === ROM_SHA1;
     return [
       { id: 'minecraft-java', ok: await isDirectory(minecraftRoot), detail: 'Minecraft Java path exists' },
+      { id: 'minecraft-version', ok: await exists(join(minecraftRoot, 'versions', MINECRAFT_VERSION, `${MINECRAFT_VERSION}.jar`)), detail: `Minecraft Java ${MINECRAFT_VERSION} exists` },
       { id: 'instance', ok: await isDirectory(instance), detail: 'Managed instance exists' },
-      { id: 'fabric-profile', ok: !!version && profileFound && await exists(join(minecraftRoot, 'versions', version, `${version}.json`)), detail: 'Fabric profile/config exists' },
-      { id: 'fabric-api', ok: modFiles.some(name => /^fabric-api-.*\.jar$/i.test(name)), detail: 'Fabric API JAR exists' },
-      { id: 'mario-mod', ok: modFiles.some(name => /^mario64mc-.*\.jar$/i.test(name)), detail: 'mario64mc JAR exists' },
+      { id: 'fabric-profile', ok: !!version && versionAtLeast(receipt?.fabricLoader ?? '0', '0.16.10') && profileFound && await exists(join(minecraftRoot, 'versions', version, `${version}.json`)), detail: 'Fabric profile/config exists' },
+      { id: 'fabric-api', ok: apiOk, detail: 'Fabric API JAR exists' },
+      { id: 'mario-mod', ok: modOk, detail: 'mario64mc JAR exists with recorded SHA-256' },
       { id: 'native', ok: await exists(join(instance, 'config', 'mario64', nativeLibraryName())), detail: 'sm64 native library exists' },
       { id: 'rom', ok: await exists(romPath), detail: 'baserom.us.z64 exists' },
       { id: 'rom-hash', ok: romOk, detail: 'ROM checksum is supported' },

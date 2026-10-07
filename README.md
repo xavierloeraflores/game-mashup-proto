@@ -13,6 +13,8 @@ npm test
 npm start
 ```
 
-The launcher never downloads a ROM or bypasses Minecraft sign-in. The Mario integration's upstream native build has only been tested on Windows x64; the app reports the other platforms as unsupported for this particular integration while its discovery and registry work across Windows, macOS, and Linux.
+Build a distributable on the matching operating system with `npm run package:win`, `npm run package:mac`, or `npm run package:linux`. Output goes to `releases/`. Inspect local discovery without opening the desktop app with `npm run doctor -- --minecraft <path> --rom <path>`; both flags are optional.
+
+The launcher never downloads a ROM or bypasses Minecraft sign-in. Its first integration uses an isolated game directory under the launcher's app data, with the Fabric profile registered in the official Minecraft Launcher. [Upstream](https://github.com/Zckyy/mario64-in-minecraft#limitations) has tested the native mod on Windows x64; macOS and Linux native builds are included as experimental paths and need real-game verification. The Play button selects the managed profile and opens Minecraft Launcher; the user then presses Play there to use the launcher's normal authentication.
 
 See [docs/architecture.md](docs/architecture.md) for the protocol and [docs/acceptance.md](docs/acceptance.md) for the real-world acceptance path.

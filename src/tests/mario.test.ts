@@ -26,11 +26,13 @@ test('installation verification checks the isolated profile and ROM contents', a
     const instance = installer.instancePath();
     const version = 'fabric-loader-0.16.10-1.21.4';
     await mkdir(join(minecraft, 'versions', version), { recursive: true });
+    await mkdir(join(minecraft, 'versions', '1.21.4'), { recursive: true });
     await mkdir(join(instance, 'mods'), { recursive: true });
     await mkdir(join(instance, 'config', 'mario64'), { recursive: true });
     await writeFile(join(minecraft, 'versions', version, `${version}.json`), '{}');
+    await writeFile(join(minecraft, 'versions', '1.21.4', '1.21.4.jar'), 'vanilla jar');
     await writeFile(join(minecraft, 'launcher_profiles.json'), JSON.stringify({ profiles: { [PROFILE_ID]: { gameDir: instance, lastVersionId: version } } }));
-    await writeFile(join(instance, 'installation.json'), JSON.stringify({ fabricLoader: '0.16.10' }));
+    await writeFile(join(instance, 'installation.json'), JSON.stringify({ fabricLoader: '0.16.10', fabricApiFile: 'fabric-api-0.119.4+1.21.4.jar', installedVersion: '0.1.0', sha256: 'wrong' }));
     await writeFile(join(instance, 'mods', 'fabric-api-0.119.4+1.21.4.jar'), 'fake jar');
     await writeFile(join(instance, 'mods', 'mario64mc-0.1.0.jar'), 'fake jar');
     await writeFile(join(instance, 'config', 'mario64', process.platform === 'win32' ? 'sm64.dll' : process.platform === 'darwin' ? 'libsm64.dylib' : 'libsm64.so'), 'fake library');

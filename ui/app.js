@@ -109,7 +109,17 @@ $('install').addEventListener('click', () => action(async () => {
       tag.textContent = `${ready ? '✓' : '✗'} ${tool}`;
       checks.append(tag);
     }
-    $('run-build').disabled = Object.values(review.buildTools).some(ready => !ready);
+    const instructions = {
+      git: 'Git: install from git-scm.com (Git for Windows includes Bash).',
+      python: 'Python 3: install from python.org/downloads and make python available to this app.',
+      bash: 'Bash: install Git for Windows, or your system Bash package.',
+      compiler: 'GCC and Make: on Windows use w64devkit or MinGW and select its bin directory in the app.',
+      java: 'Java: install a Java 21 runtime so the official Fabric installer can run.',
+    };
+    const missing = Object.entries(review.buildTools).filter(([, ready]) => !ready).map(([tool]) => instructions[tool]);
+    $('missing-guidance').hidden = missing.length === 0;
+    $('missing-guidance').textContent = missing.length ? `Install the missing tools, then reopen this review:\n${missing.join('\n')}` : '';
+    $('run-build').disabled = missing.length > 0;
     $('review-overlay').classList.remove('hidden');
   } finally { $('install').disabled = false; }
 }));

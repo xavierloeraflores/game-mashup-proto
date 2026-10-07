@@ -6,6 +6,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
   <title>Game Mashup Launcher</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="guidance.css">
 </head>
 <body>
   <div class="shell">
@@ -31,7 +32,7 @@
     </main>
   </div>
   <div id="review-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="review-title">
-    <div class="review-card"><div class="review-top"><div><div class="eyebrow">REVIEWED SOURCE EXECUTION</div><h2 id="review-title">Compile libsm64</h2></div><button id="close-review" class="icon-button" type="button" aria-label="Close">×</button></div><p>This mashup requires compiling libsm64 from source. The upstream script below will run only after you choose Run. Inspect its contents and source commit first.</p><div id="review-meta" class="review-meta"></div><div id="tool-checks" class="tool-checks"></div><details><summary>View script: scripts/build-libsm64.sh</summary><pre id="script"></pre></details><div class="review-actions"><button id="cancel-build" class="button secondary" type="button">Cancel</button><button id="run-build" class="button primary" type="button">Run reviewed script</button></div></div>
+    <div class="review-card"><div class="review-top"><div><div class="eyebrow">REVIEWED SOURCE EXECUTION</div><h2 id="review-title">Compile libsm64</h2></div><button id="close-review" class="icon-button" type="button" aria-label="Close">×</button></div><p>This mashup requires compiling libsm64 from source. The upstream script below will run only after you choose Run. Inspect its contents and source commit first.</p><div id="review-meta" class="review-meta"></div><div id="tool-checks" class="tool-checks"></div><div id="missing-guidance" class="missing-guidance" hidden></div><details><summary>View script: scripts/build-libsm64.sh</summary><pre id="script"></pre></details><div class="review-actions"><button id="cancel-build" class="button secondary" type="button">Cancel</button><button id="run-build" class="button primary" type="button">Run reviewed script</button></div></div>
   </div>
   <script src="app.js"></script>
 </body>

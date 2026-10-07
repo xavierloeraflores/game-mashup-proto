@@ -9,7 +9,21 @@
     "build": "tsc && node scripts/copy-assets.cjs",
     "test": "npm run build && node --test dist/tests/*.test.js",
     "start": "npm run build && electron .",
-    "dev": "npm run build && electron ."
+    "dev": "npm run build && electron .",
+    "doctor": "npm run build && node dist/doctor.js",
+    "package:win": "npm run build && electron-builder --win portable --publish never",
+    "package:mac": "npm run build && electron-builder --mac dmg --publish never",
+    "package:linux": "npm run build && electron-builder --linux AppImage --publish never"
+  },
+  "build": {
+    "appId": "dev.gamemashup.launcher",
+    "productName": "Game Mashup Launcher",
+    "asar": true,
+    "directories": { "output": "releases" },
+    "files": ["dist/**/*", "registry/**/*", "package.json"],
+    "win": { "target": "portable" },
+    "mac": { "target": "dmg" },
+    "linux": { "target": "AppImage", "category": "Game" }
   },
   "dependencies": {
     "yaml": "^2.8.1"
@@ -17,6 +31,7 @@
   "devDependencies": {
     "@types/node": "^24.7.0",
     "electron": "^38.2.2",
+    "electron-builder": "^26.15.3",
     "typescript": "^5.9.3"
   }
 }
