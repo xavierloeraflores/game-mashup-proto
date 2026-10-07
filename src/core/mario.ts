@@ -3,8 +3,7 @@ import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { platform } from 'node:os';
 import { basename, dirname, join } from 'node:path';
-import { promisify } from 'node:util';
-import { extractorPath } from './archive';
+import { strFromU8, unzipSync } from 'fflate';
 import { download, getJson, hashFile } from './download';
 import { exists, isDirectory, readJson } from './fs';
 import { commandWorks, run, type LogHandler } from './process';
@@ -21,8 +20,6 @@ interface ModrinthVersion { version_number: string; files: ModrinthFile[]; versi
 interface FabricInstallerVersion { version: string; url: string; stable: boolean }
 interface FabricLoaderVersion { loader: { version: string; stable: boolean } }
 interface FabricModMetadata { id?: string; version?: string; depends?: { minecraft?: string | string[] } }
-
-const execFileAsync = promisify(execFile);
 
 export interface BuildReview {
   source: string;
@@ -89,8 +86,9 @@ export function githubAssetSha256(digest?: string): string | undefined {
 export async function validateMarioJar(path: string, expectedVersion: string): Promise<void> {
   let metadata: FabricModMetadata;
   try {
-    const { stdout } = await execFileAsync(extractorPath(), ['e', '-so', path, 'fabric.mod.json'], { maxBuffer: 256 * 1024, timeout: 10_000 });
-    metadata = JSON.parse(stdout) as FabricModMetadata;
+    const files = unzipSync(await readFile(path), { filter: file => file.name === 'fabric.mod.json' && file.originalSize <= 256 * 1024 });
+    if (!files['fabric.mod.json']) throw new Error('missing metadata');
+    metadata = JSON.parse(strFromU8(files['fabric.mod.json'])) as FabricModMetadata;
   } catch {
     throw new Error('Mario release JAR has no readable fabric.mod.json.');
   }

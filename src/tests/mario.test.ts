@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { promisify } from 'node:util';
-import { extractorPath } from '../core/archive';
+import { strToU8, zipSync } from 'fflate';
 import { MarioInstaller, PROFILE_ID, ROM_SHA1, githubAssetSha256, javaMajorVersion, validateMarioJar } from '../core/mario';
 
 test('GitHub release JAR requires a complete SHA-256 digest', () => {
@@ -17,19 +15,15 @@ test('GitHub release JAR requires a complete SHA-256 digest', () => {
 test('Mario JAR metadata must match its release and Minecraft 1.21.4', async () => {
   const root = await mkdtemp(join(tmpdir(), 'mashup-jar-'));
   try {
-    const files = join(root, 'files');
-    await mkdir(files);
     const jar = join(root, 'mario64mc-0.1.0.jar');
     const metadata = { id: 'mario64', version: '0.1.0', depends: { minecraft: '~1.21.4' } };
-    await writeFile(join(files, 'fabric.mod.json'), JSON.stringify(metadata));
-    await promisify(execFile)(extractorPath(), ['a', '-tzip', jar, 'fabric.mod.json'], { cwd: files });
+    await writeFile(jar, zipSync({ 'fabric.mod.json': strToU8(JSON.stringify(metadata)) }));
     await validateMarioJar(jar, '0.1.0');
     await assert.rejects(() => validateMarioJar(jar, '0.2.0'), /does not match version/);
 
     metadata.depends.minecraft = '~1.21.5';
-    await writeFile(join(files, 'fabric.mod.json'), JSON.stringify(metadata));
     const incompatible = join(root, 'incompatible.jar');
-    await promisify(execFile)(extractorPath(), ['a', '-tzip', incompatible, 'fabric.mod.json'], { cwd: files });
+    await writeFile(incompatible, zipSync({ 'fabric.mod.json': strToU8(JSON.stringify(metadata)) }));
     await assert.rejects(() => validateMarioJar(incompatible, '0.1.0'), /does not explicitly support/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });

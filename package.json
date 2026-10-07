@@ -19,7 +19,9 @@
     "appId": "dev.gamemashup.launcher",
     "productName": "Game Mashup Launcher",
     "asar": true,
-    "asarUnpack": ["node_modules/7zip-bin/**"],
+    "asarUnpack": [
+      "node_modules/7zip-bin/**"
+    ],
     "directories": {
       "output": "releases"
     },
@@ -41,6 +43,7 @@
   },
   "dependencies": {
     "7zip-bin": "^5.2.0",
+    "fflate": "0.8.3",
     "yaml": "^2.8.1"
   },
   "devDependencies": {
