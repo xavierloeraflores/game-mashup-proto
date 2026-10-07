@@ -12,7 +12,7 @@ export const ROM_SHA1 = '9bef1128717f958171a4afac3ed78ee2bb4e86ce';
 export const PROFILE_ID = 'game-mashup-mario64';
 const REPOSITORY = 'Zckyy/mario64-in-minecraft';
 
-interface GithubAsset { name: string; browser_download_url: string }
+interface GithubAsset { name: string; browser_download_url: string; digest?: string }
 interface GithubRelease { tag_name: string; published_at: string; assets: GithubAsset[] }
 interface ModrinthFile { filename: string; url: string; primary: boolean; hashes: { sha512?: string; sha1?: string } }
 interface ModrinthVersion { version_number: string; files: ModrinthFile[]; version_type: string }
@@ -75,6 +75,10 @@ export function javaMajorVersion(output: string): number | undefined {
   const match = output.match(/(?:java|openjdk) version "(\d+)(?:\.(\d+))?/i);
   if (!match) return undefined;
   return Number(match[1]) === 1 ? Number(match[2]) : Number(match[1]);
+}
+
+export function githubAssetSha256(digest?: string): string | undefined {
+  return digest?.match(/^sha256:([a-f0-9]{64})$/i)?.[1].toLowerCase();
 }
 
 async function atomicJson(path: string, value: unknown): Promise<void> {
@@ -153,8 +157,10 @@ export class MarioInstaller {
     const loader = await this.installFabric(options);
     const mod = release.assets.find(asset => /^mario64mc-[\w.-]+\.jar$/i.test(asset.name));
     if (!mod) throw new Error('Upstream release has no Fabric mod JAR.');
+    const expectedModHash = githubAssetSha256(mod.digest);
+    if (!expectedModHash) throw new Error('Upstream release JAR has no SHA-256 digest in GitHub release metadata.');
     const modCache = join(this.dataRoot, 'cache', 'mods', mod.name);
-    const modHash = await download(mod.browser_download_url, modCache);
+    const modHash = await download(mod.browser_download_url, modCache, { algorithm: 'sha256', value: expectedModHash });
 
     const apiVersions = await getJson<ModrinthVersion[]>(`https://api.modrinth.com/v2/project/fabric-api/version?game_versions=%5B%22${MINECRAFT_VERSION}%22%5D&loaders=%5B%22fabric%22%5D`);
     const api = apiVersions.find(item => item.version_type === 'release' && item.files.some(file => file.filename.endsWith('.jar')));

@@ -3,7 +3,13 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { MarioInstaller, PROFILE_ID, ROM_SHA1, javaMajorVersion } from '../core/mario';
+import { MarioInstaller, PROFILE_ID, ROM_SHA1, githubAssetSha256, javaMajorVersion } from '../core/mario';
+
+test('GitHub release JAR requires a complete SHA-256 digest', () => {
+  assert.equal(githubAssetSha256(`sha256:${'A'.repeat(64)}`), 'a'.repeat(64));
+  assert.equal(githubAssetSha256('sha256:bad'), undefined);
+  assert.equal(githubAssetSha256(`sha1:${'a'.repeat(40)}`), undefined);
+});
 
 test('Java version gate recognizes Java 21 and rejects older runtime formats', () => {
   assert.equal(javaMajorVersion('openjdk version "21.0.9" 2025-10-21'), 21);
