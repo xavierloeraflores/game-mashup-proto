@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { access } from 'node:fs/promises';
 import { discoverGames, resolveGameRequirements } from './core/discovery';
 import { MarioInstaller } from './core/mario';
+import { MW2Installer, isMw2MultiplayerPath } from './core/mw2';
 import { CrossOverSteamProvider, SteamProvider } from './core/providers/steam';
 import { MinecraftLauncherProvider } from './core/providers/minecraft';
 import { loadRegistry } from './core/registry';
@@ -49,6 +50,11 @@ async function main(): Promise<void> {
   console.log('Minecraft Bedrock detected:', mcStatus.bedrockDetected);
   console.log('Game installations:', JSON.stringify(installations, null, 2));
   console.log('Mario requirements:', resolveGameRequirements(registry, 'mario64-in-minecraft', installations, { 'super-mario-64': romValid }));
+  const mw2Path = installations['call-of-duty-modern-warfare-2-2009']?.[0]?.path;
+  console.log('MW2 (2009) multiplayer files:', mw2Path ? await isMw2MultiplayerPath(mw2Path) : false);
+  if (value('--data-root')) {
+    console.log('MW2 mashup installed:', await new MW2Installer(resolve(value('--data-root')!)).verify());
+  }
 }
 
 void main().catch(error => { console.error(error); process.exitCode = 1; });

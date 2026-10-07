@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('launcher', {
   install: (commit: string) => ipcRenderer.invoke('install', commit),
   play: () => ipcRenderer.invoke('play'),
   openSource: () => ipcRenderer.invoke('open-source'),
+  openMw2Source: () => ipcRenderer.invoke('open-mw2-source'),
   installMw2: () => ipcRenderer.invoke('install-mw2'),
   playMw2: () => ipcRenderer.invoke('play-mw2'),
   onLog: (listener: (line: string) => void) => ipcRenderer.on('log', (_event, line: string) => listener(line)),

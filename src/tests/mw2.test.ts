@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { zipSync } from 'fflate';
-import { IW4L_RELEASE, MW2Installer, releaseFiles } from '../core/mw2';
+import { IW4L_RELEASE, MW2Installer, isMw2MultiplayerPath, releaseFiles } from '../core/mw2';
 import { hashFile } from '../core/download';
 
 test('IW4L archive accepts the pinned release layout and rejects escaped entries', () => {
@@ -32,4 +32,13 @@ test('MW2 install rejects an executable whose hash differs from the pinned relea
   assert.equal(await new MW2Installer(root).verify(), false);
   await writeFile(join(instance, 'iw4l.exe'), 'changed');
   assert.equal(await new MW2Installer(root).verify(), false);
+});
+
+test('MW2 multiplayer detection accepts an installed non-English zone', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mashup-mw2-locale-'));
+  await writeFile(join(root, 'iw4mp.exe'), 'game');
+  assert.equal(await isMw2MultiplayerPath(root), false);
+  await mkdir(join(root, 'zone', 'french'), { recursive: true });
+  await writeFile(join(root, 'zone', 'french', 'common_mp.ff'), 'assets');
+  assert.equal(await isMw2MultiplayerPath(root), true);
 });

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { readFile, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { unzipSync } from 'fflate';
 import { download, hashFile } from './download';
@@ -31,6 +31,18 @@ export function releaseFiles(zip: Uint8Array): Record<string, Uint8Array> {
   }
   if (!selected['iw4l.exe'] || !selected['LICENSE'] || !selected['README.txt']) throw new Error('IW4L release archive is incomplete.');
   return selected;
+}
+
+export async function isMw2MultiplayerPath(path: string): Promise<boolean> {
+  if (!await exists(join(path, 'iw4mp.exe'))) return false;
+  const zone = join(path, 'zone');
+  try {
+    const languages = await readdir(zone, { withFileTypes: true });
+    for (const language of languages) {
+      if (language.isDirectory() && await exists(join(zone, language.name, 'common_mp.ff'))) return true;
+    }
+  } catch { /* Missing or unreadable multiplayer assets. */ }
+  return false;
 }
 
 export class MW2Installer {
@@ -71,7 +83,7 @@ export class MW2Installer {
 
   async play(mw2Path: string): Promise<void> {
     if (!await this.verify()) throw new Error('Install the MW2 mashup first.');
-    if (!await exists(join(mw2Path, 'iw4mp.exe')) || !await exists(join(mw2Path, 'zone', 'english', 'common_mp.ff'))) {
+    if (!await isMw2MultiplayerPath(mw2Path)) {
       throw new Error('The selected MW2 (2009) folder is missing its multiplayer files.');
     }
     const root = this.instancePath();

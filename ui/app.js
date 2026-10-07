@@ -71,7 +71,7 @@ function render(data) {
       const install = document.createElement('button');
       install.className = 'button primary';
       install.textContent = data.mw2Ready ? 'Repair install' : 'Install';
-      install.disabled = !data.mw2Path || !data.mw2Supported;
+      install.disabled = !data.mw2FilesReady || !data.mw2Supported;
       install.addEventListener('click', () => action(async () => {
         install.disabled = true;
         try { render(await window.launcher.installMw2()); notice('MW2 mashup installed. Choose Play to open the Minecraft world.'); }
@@ -82,7 +82,11 @@ function render(data) {
       play.textContent = 'Play Minecraft world ▶';
       play.disabled = !data.mw2Ready;
       play.addEventListener('click', () => action(async () => notice(await window.launcher.playMw2())));
-      actions.append(install, play);
+      const source = document.createElement('button');
+      source.className = 'button link';
+      source.textContent = 'Source ↗';
+      source.addEventListener('click', () => action(() => window.launcher.openMw2Source()));
+      actions.append(install, play, source);
       item.append(actions);
     }
     future.append(item);
