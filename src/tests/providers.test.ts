@@ -20,6 +20,21 @@ test('Minecraft provider does not mistake a launcher or Bedrock for Java', async
   } finally { await rm(home, { recursive: true, force: true }); }
 });
 
+test('Minecraft provider does not treat a prefetched version manifest as an installed game', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'mashup-mc-'));
+  try {
+    const root = join(home, 'Roaming', '.minecraft');
+    await mkdir(join(root, 'versions', '1.21.4'), { recursive: true });
+    await writeFile(join(root, 'versions', '1.21.4', '1.21.4.json'), '{}');
+    await writeFile(join(root, 'launcher_profiles.json'), JSON.stringify({ profiles: { Mario: { lastVersionId: '1.21.4' } } }));
+    const provider = new MinecraftLauncherProvider(home, 'win32', { APPDATA: join(home, 'Roaming'), LOCALAPPDATA: join(home, 'Local') });
+    const result = await provider.inspect();
+    assert.equal(result.launcherInstalled, true);
+    assert.equal(result.javaUsable, false);
+    assert.equal(result.installations.length, 0);
+  } finally { await rm(home, { recursive: true, force: true }); }
+});
+
 test('Minecraft provider reads a custom game directory and exact installed version', async () => {
   const home = await mkdtemp(join(tmpdir(), 'mashup-mc-'));
   try {
