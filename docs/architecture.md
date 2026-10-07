@@ -35,6 +35,6 @@ The upstream project says to enter a single-player world and press **M** to acti
 ## Current limits
 
 - The Minecraft Launcher owns sign-in and entitlement checks. The desktop app opens the selected profile there; the user presses Play inside Minecraft Launcher. Direct game launch is not implemented because the official launcher does not expose a verified profile launch command to this prototype.
-- The upstream native mod is documented as tested on Windows x64. The script names Linux/macOS outputs, but those platforms still require end-to-end validation.
+- The upstream native mod is documented as tested on Windows x64. The build script names Linux/macOS outputs, but the mod currently opens a file named `sm64.dll` on every platform. The launcher copies the platform's compiled library to that exact name in the instance. Linux and macOS still require end-to-end validation.
 - Upstream has not published a verified MW2 mashup package. The registry keeps that concept unavailable rather than inventing a repository.
 - Windows x64 has an optional launcher-managed tool download. Other platforms use guided tool selection. The launcher does not modify global tool installations.

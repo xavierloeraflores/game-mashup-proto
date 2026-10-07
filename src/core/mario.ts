@@ -208,7 +208,8 @@ export class MarioInstaller {
     await copyFile(modCache, join(modsDir, mod.name));
     await copyFile(apiCache, join(modsDir, apiFile.filename));
     await copyFile(options.romPath, join(configDir, 'baserom.us.z64'));
-    await copyFile(built, join(configDir, nativeLibraryName()));
+    // Upstream's MarioController currently opens this exact path on every OS.
+    await copyFile(built, join(configDir, 'sm64.dll'));
     await this.writeProfile(options.minecraftRoot, loader);
     const receipt: InstallReceipt = {
       repository: REPOSITORY, releaseTag: release.tag_name, downloadUrl: mod.browser_download_url,
@@ -254,7 +255,7 @@ export class MarioInstaller {
       { id: 'fabric-profile', ok: !!version && versionAtLeast(receipt?.fabricLoader ?? '0', '0.16.10') && profileFound && await exists(join(minecraftRoot, 'versions', version, `${version}.json`)), detail: 'Fabric profile/config exists' },
       { id: 'fabric-api', ok: apiOk, detail: 'Fabric API JAR matches recorded SHA-512' },
       { id: 'mario-mod', ok: modOk, detail: 'mario64mc JAR matches SHA-256 and Minecraft metadata' },
-      { id: 'native', ok: await exists(join(instance, 'config', 'mario64', nativeLibraryName())), detail: 'sm64 native library exists' },
+      { id: 'native', ok: await exists(join(instance, 'config', 'mario64', 'sm64.dll')), detail: 'sm64 native library exists at the path required by the mod' },
       { id: 'rom', ok: await exists(romPath), detail: 'baserom.us.z64 exists' },
       { id: 'rom-hash', ok: romOk, detail: 'ROM checksum is supported' },
     ];

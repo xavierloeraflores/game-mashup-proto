@@ -71,13 +71,16 @@ test('installation verification checks the isolated profile and ROM contents', a
     await writeFile(join(instance, 'installation.json'), JSON.stringify({ fabricLoader: '0.16.10', fabricApiFile: 'fabric-api-0.119.4+1.21.4.jar', fabricApiSha512: apiHash, installedVersion: '0.1.0', sha256: 'wrong' }));
     await writeFile(join(instance, 'mods', 'fabric-api-0.119.4+1.21.4.jar'), 'fake jar');
     await writeFile(join(instance, 'mods', 'mario64mc-0.1.0.jar'), 'fake jar');
-    await writeFile(join(instance, 'config', 'mario64', process.platform === 'win32' ? 'sm64.dll' : process.platform === 'darwin' ? 'libsm64.dylib' : 'libsm64.so'), 'fake library');
+    await writeFile(join(instance, 'config', 'mario64', 'sm64.dll'), 'fake library');
     await writeFile(join(instance, 'config', 'mario64', 'baserom.us.z64'), 'invalid rom');
     const checks = await installer.verify(minecraft);
     assert.equal(checks.find(item => item.id === 'fabric-profile')?.ok, true);
     assert.equal(checks.find(item => item.id === 'fabric-api')?.ok, true);
+    assert.equal(checks.find(item => item.id === 'native')?.ok, true);
     assert.equal(checks.find(item => item.id === 'rom')?.ok, true);
     assert.equal(checks.find(item => item.id === 'rom-hash')?.ok, false);
+    await rm(join(instance, 'config', 'mario64', 'sm64.dll'));
+    assert.equal((await installer.verify(minecraft)).find(item => item.id === 'native')?.ok, false);
     await writeFile(join(instance, 'mods', 'fabric-api-0.119.4+1.21.4.jar'), 'corrupt jar');
     assert.equal((await installer.verify(minecraft)).find(item => item.id === 'fabric-api')?.ok, false);
     await assert.rejects(() => installer.selectProfile(minecraft), /not ready/);
