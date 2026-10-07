@@ -91,6 +91,8 @@ $('refresh').addEventListener('click', () => action(refresh));
 $('minecraft-path').addEventListener('click', () => action(async () => render(await window.launcher.chooseMinecraft())));
 $('rom-path').addEventListener('click', () => action(async () => render(await window.launcher.chooseRom())));
 $('toolchain-path').addEventListener('click', () => action(async () => render(await window.launcher.chooseToolchain())));
+$('python-path').addEventListener('click', () => action(async () => render(await window.launcher.choosePython())));
+$('java-path').addEventListener('click', () => action(async () => render(await window.launcher.chooseJava())));
 $('source').addEventListener('click', () => action(() => window.launcher.openSource()));
 $('install').addEventListener('click', () => action(async () => {
   if (!state?.minecraftRoot || !state.gameRequirements[0].satisfied) { notice('Install and run Minecraft: Java Edition 1.21.4 in Minecraft Launcher, then choose its .minecraft directory.'); return; }
@@ -111,10 +113,10 @@ $('install').addEventListener('click', () => action(async () => {
     }
     const instructions = {
       git: 'Git: install from git-scm.com (Git for Windows includes Bash).',
-      python: 'Python 3: install from python.org/downloads and make python available to this app.',
+      python: 'Python 3: install from python.org/downloads, then choose its directory in the app.',
       bash: 'Bash: install Git for Windows, or your system Bash package.',
       compiler: 'GCC and Make: on Windows use w64devkit or MinGW and select its bin directory in the app.',
-      java: 'Java: install a Java 21 runtime so the official Fabric installer can run.',
+      java: 'Java: install a Java 21 runtime, then choose its bin directory in the app.',
     };
     const missing = Object.entries(review.buildTools).filter(([, ready]) => !ready).map(([tool]) => instructions[tool]);
     $('missing-guidance').hidden = missing.length === 0;

@@ -1,5 +1,6 @@
 import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { execFile } from 'node:child_process';
 import { platform } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { download, getJson, hashFile } from './download';
@@ -33,6 +34,8 @@ export interface InstallOptions {
   minecraftRoot: string;
   romPath: string;
   toolchainBinPath?: string;
+  pythonBinPath?: string;
+  javaBinPath?: string;
 }
 
 export interface InstallReceipt {
@@ -64,6 +67,12 @@ function versionAtLeast(actual: string, minimum: string): boolean {
     if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
   }
   return true;
+}
+
+export function javaMajorVersion(output: string): number | undefined {
+  const match = output.match(/(?:java|openjdk) version "(\d+)(?:\.(\d+))?/i);
+  if (!match) return undefined;
+  return Number(match[1]) === 1 ? Number(match[2]) : Number(match[1]);
 }
 
 async function atomicJson(path: string, value: unknown): Promise<void> {
@@ -101,14 +110,14 @@ export class MarioInstaller {
     const scriptPath = join(sourceDir, 'scripts', 'build-libsm64.sh');
     const script = await readFile(scriptPath, 'utf8');
     const scriptSha256 = createHash('sha256').update(script).digest('hex');
-    const env = this.buildEnvironment(options.toolchainBinPath);
+    const env = this.buildEnvironment(options);
     const bash = await this.bashPath();
     const buildTools = {
       git: await commandWorks('git'),
-      python: await commandWorks('python', ['-c', 'import sys; assert sys.version_info.major == 3']) || await commandWorks('python3', ['-c', 'import sys; assert sys.version_info.major == 3']),
+      python: await commandWorks('python', ['-c', 'import sys; assert sys.version_info.major == 3'], env) || await commandWorks('python3', ['-c', 'import sys; assert sys.version_info.major == 3'], env),
       bash: !!bash,
       compiler: await this.bashCommandWorks(bash, 'command -v gcc >/dev/null && command -v make >/dev/null', env),
-      java: await commandWorks('java'),
+      java: await this.java21Works(env),
     };
     return { source: `https://github.com/${REPOSITORY}`, releaseTag: release.tag_name, sourceCommit, scriptSha256, scriptPath, script, buildTools, romSha1 };
   }
@@ -126,7 +135,7 @@ export class MarioInstaller {
     const bash = await this.bashPath();
     if (!bash) throw new Error('Bash is required. On Windows, install Git for Windows.');
     this.log('Building libsm64 from reviewed upstream source...\n');
-    await run(bash, ['scripts/build-libsm64.sh'], { cwd: sourceDir, env: this.buildEnvironment(options.toolchainBinPath), log: this.log });
+    await run(bash, ['scripts/build-libsm64.sh'], { cwd: sourceDir, env: this.buildEnvironment(options), log: this.log });
     const built = join(sourceDir, 'build', 'libsm64', 'dist', nativeLibraryName());
     if (!await exists(built)) throw new Error(`Build succeeded but ${built} was not found.`);
 
@@ -135,7 +144,7 @@ export class MarioInstaller {
     const configDir = join(instance, 'config', 'mario64');
     await mkdir(modsDir, { recursive: true });
     await mkdir(configDir, { recursive: true });
-    const loader = await this.installFabric(options.minecraftRoot);
+    const loader = await this.installFabric(options);
     const mod = release.assets.find(asset => /^mario64mc-[\w.-]+\.jar$/i.test(asset.name));
     if (!mod) throw new Error('Upstream release has no Fabric mod JAR.');
     const modCache = join(this.dataRoot, 'cache', 'mods', mod.name);
@@ -231,8 +240,16 @@ export class MarioInstaller {
   private sourcePath(tag: string): string { return join(this.dataRoot, 'sources', `mario64-in-minecraft-${tag.replace(/[^\w.-]/g, '_')}`); }
 
   private async gitHead(cwd: string): Promise<string> {
-    const { execFile } = await import('node:child_process');
     return await new Promise<string>((resolve, reject) => execFile('git', ['rev-parse', 'HEAD'], { cwd }, (error, stdout) => error ? reject(error) : resolve(stdout.trim())));
+  }
+
+  private async java21Works(env: NodeJS.ProcessEnv): Promise<boolean> {
+    return await new Promise<boolean>(resolve => {
+      execFile('java', ['-version'], { env }, (error, stdout, stderr) => {
+        if (error) { resolve(false); return; }
+        resolve((javaMajorVersion(`${stdout}\n${stderr}`) ?? 0) >= 21);
+      });
+    });
   }
 
   private async bashPath(): Promise<string | undefined> {
@@ -245,8 +262,9 @@ export class MarioInstaller {
     return await commandWorks('bash', ['--version']) ? 'bash' : undefined;
   }
 
-  private buildEnvironment(toolchainBinPath?: string): NodeJS.ProcessEnv {
-    return { ...process.env, PATH: toolchainBinPath ? `${toolchainBinPath}${platform() === 'win32' ? ';' : ':'}${process.env.PATH ?? ''}` : process.env.PATH };
+  private buildEnvironment(options: Pick<InstallOptions, 'toolchainBinPath' | 'pythonBinPath' | 'javaBinPath'>): NodeJS.ProcessEnv {
+    const extra = [options.toolchainBinPath, options.pythonBinPath, options.javaBinPath].filter((path): path is string => !!path);
+    return { ...process.env, PATH: [...extra, process.env.PATH ?? ''].join(platform() === 'win32' ? ';' : ':') };
   }
 
   private async bashCommandWorks(bash: string | undefined, script: string, env: NodeJS.ProcessEnv): Promise<boolean> {
@@ -254,7 +272,8 @@ export class MarioInstaller {
     try { await run(bash, ['-c', script], { env }); return true; } catch { return false; }
   }
 
-  private async installFabric(minecraftRoot: string): Promise<string> {
+  private async installFabric(options: InstallOptions): Promise<string> {
+    const minecraftRoot = options.minecraftRoot;
     const versions = await getJson<FabricLoaderVersion[]>(`https://meta.fabricmc.net/v2/versions/loader/${MINECRAFT_VERSION}`);
     const loader = versions.find(item => item.loader.stable && versionAtLeast(item.loader.version, '0.16.10'))?.loader.version;
     if (!loader) throw new Error('No compatible stable Fabric Loader found.');
@@ -268,7 +287,7 @@ export class MarioInstaller {
       args.push('-launcher', await exists(join(minecraftRoot, 'launcher_profiles_microsoft_store.json')) ? 'microsoft_store' : 'win32');
     }
     this.log(`Installing Fabric Loader ${loader}...\n`);
-    await run('java', args, { log: this.log });
+    await run('java', args, { env: this.buildEnvironment(options), log: this.log });
     return loader;
   }
 

@@ -22,7 +22,7 @@ The integration declares `minecraft-java` version `1.21.4`, `super-mario-64`, as
 Install performs these stages:
 
 1. Verify Minecraft Java 1.21.4 and the selected ROM.
-2. Read the [latest upstream release](https://github.com/Zckyy/mario64-in-minecraft/releases) and clone that release tag into launcher data. Show the exact `scripts/build-libsm64.sh` and source commit for explicit approval. Check Git, Bash, Python 3, GCC/Make, and Java. A chosen compiler directory is prepended to the child process PATH only.
+2. Read the [latest upstream release](https://github.com/Zckyy/mario64-in-minecraft/releases) and clone that release tag into launcher data. Show the exact `scripts/build-libsm64.sh` and source commit for explicit approval. Check Git, Bash, Python 3, GCC/Make, and Java 21. Chosen compiler, Python, and Java directories are prepended to child-process PATH only; the launcher never edits global PATH.
 3. Execute the reviewed script with captured stdout/stderr. Reject a changed source commit or script hash. Confirm the built library exists.
 4. Use the [official Fabric metadata API](https://meta.fabricmc.net/) and official Maven installer to install a compatible stable loader for 1.21.4. Create a dedicated Minecraft Launcher profile with the managed game directory.
 5. Download the upstream release JAR and a matching [Fabric API](https://modrinth.com/mod/fabric-api/versions?g=1.21.4&l=fabric) release. Cache them and place them in the managed instance. Copy the locally verified ROM and native library into `config/mario64`.

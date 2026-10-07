@@ -47,7 +47,7 @@ async function snapshot() {
   const gameRequirements = resolveGameRequirements(registry, 'mario64-in-minecraft', installations, { 'super-mario-64': romValid || installedRomValid });
   return {
     registry, installations, minecraft: mcStatus, gameRequirements, romValid, installedRomValid, romError,
-    romPath: saved.romPath, toolchainBinPath: saved.toolchainBinPath,
+    romPath: saved.romPath, toolchainBinPath: saved.toolchainBinPath, pythonBinPath: saved.pythonBinPath, javaBinPath: saved.javaBinPath,
     manualPaths: saved.manualPaths,
     minecraftRoot: root,
     checks,
@@ -91,10 +91,20 @@ function registerIpc(): void {
     if (path) await updateSettings({ toolchainBinPath: path });
     return await snapshot();
   });
+  ipcMain.handle('choose-python', async () => {
+    const path = await chooseDirectory();
+    if (path) await updateSettings({ pythonBinPath: path });
+    return await snapshot();
+  });
+  ipcMain.handle('choose-java', async () => {
+    const path = await chooseDirectory();
+    if (path) await updateSettings({ javaBinPath: path });
+    return await snapshot();
+  });
   ipcMain.handle('prepare', () => withBusy(async () => {
     const state = await snapshot();
     if (!state.minecraftRoot || !state.romPath) throw new Error('Select a Minecraft Java directory and your SM64 US ROM first.');
-    options = { minecraftRoot: state.minecraftRoot, romPath: state.romPath, toolchainBinPath: state.toolchainBinPath };
+    options = { minecraftRoot: state.minecraftRoot, romPath: state.romPath, toolchainBinPath: state.toolchainBinPath, pythonBinPath: state.pythonBinPath, javaBinPath: state.javaBinPath };
     review = await installer().prepare(options);
     return review;
   }));

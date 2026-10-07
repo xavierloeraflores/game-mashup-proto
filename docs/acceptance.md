@@ -4,7 +4,7 @@
 
 - Minecraft **Java Edition 1.21.4** installed and started once through Minecraft Launcher. Bedrock alone is insufficient.
 - A user-owned **Super Mario 64 USA `.z64`** ROM with SHA-1 `9bef1128717f958171a4afac3ed78ee2bb4e86ce`.
-- Git, Bash, Python 3, Java, GCC and Make. On Windows, Git for Windows plus [w64devkit](https://github.com/skeeto/w64devkit) or a compatible MinGW toolchain can provide the build environment. Select the compiler's `bin` directory in the app when needed.
+- Git, Bash, Python 3, Java 21, GCC and Make. On Windows, Git for Windows plus [w64devkit](https://github.com/skeeto/w64devkit) or a compatible MinGW toolchain can provide the build environment. Select portable compiler, Python, or Java directories in the app when needed.
 
 ## Test procedure
 

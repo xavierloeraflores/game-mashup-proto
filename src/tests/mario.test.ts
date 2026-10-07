@@ -3,7 +3,13 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { MarioInstaller, PROFILE_ID, ROM_SHA1 } from '../core/mario';
+import { MarioInstaller, PROFILE_ID, ROM_SHA1, javaMajorVersion } from '../core/mario';
+
+test('Java version gate recognizes Java 21 and rejects older runtime formats', () => {
+  assert.equal(javaMajorVersion('openjdk version "21.0.9" 2025-10-21'), 21);
+  assert.equal(javaMajorVersion('java version "17.0.2"'), 17);
+  assert.equal(javaMajorVersion('java version "1.8.0_361"'), 8);
+});
 
 test('ROM validation rejects an unsupported file with expected and detected hashes', async () => {
   const root = await mkdtemp(join(tmpdir(), 'mashup-rom-'));

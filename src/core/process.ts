@@ -18,6 +18,6 @@ export async function run(command: string, args: string[], options: { cwd?: stri
   });
 }
 
-export async function commandWorks(command: string, args: string[] = ['--version']): Promise<boolean> {
-  try { await run(command, args); return true; } catch { return false; }
+export async function commandWorks(command: string, args: string[] = ['--version'], env?: NodeJS.ProcessEnv): Promise<boolean> {
+  try { await run(command, args, { env }); return true; } catch { return false; }
 }

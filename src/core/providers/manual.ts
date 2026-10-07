@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { exists, isDirectory, readJson } from '../fs';
 import type { GameInstallation, GameMetadata, GameProvider } from '../types';
 
-export interface Settings { manualPaths: Record<string, string>; romPath?: string; toolchainBinPath?: string }
+export interface Settings { manualPaths: Record<string, string>; romPath?: string; toolchainBinPath?: string; pythonBinPath?: string; javaBinPath?: string }
 
 export class ManualProvider implements GameProvider {
   readonly id = 'manual';

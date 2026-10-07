@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('launcher', {
   chooseMinecraft: () => ipcRenderer.invoke('choose-minecraft'),
   chooseRom: () => ipcRenderer.invoke('choose-rom'),
   chooseToolchain: () => ipcRenderer.invoke('choose-toolchain'),
+  choosePython: () => ipcRenderer.invoke('choose-python'),
+  chooseJava: () => ipcRenderer.invoke('choose-java'),
   prepare: () => ipcRenderer.invoke('prepare'),
   install: (commit: string) => ipcRenderer.invoke('install', commit),
   play: () => ipcRenderer.invoke('play'),
