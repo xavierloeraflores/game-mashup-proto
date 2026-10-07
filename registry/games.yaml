@@ -1,0 +1,17 @@
+games:
+  - id: minecraft-java
+    name: "Minecraft: Java Edition"
+    providerIds: [minecraft-launcher, manual]
+  - id: super-mario-64
+    name: Super Mario 64
+    providerIds: [manual]
+    assetOnly: true
+  - id: call-of-duty-modern-warfare-2-2009
+    name: "Call of Duty: Modern Warfare 2 (2009)"
+    providerIds: [steam, crossover-steam, manual]
+    steamAppIds: [10180]
+  - id: call-of-duty-modern-warfare-ii-2022
+    name: "Call of Duty: Modern Warfare II (2022)"
+    providerIds: [steam, crossover-steam, manual]
+    steamAppIds: [1962660]
+    steamParentAppId: 1938090

@@ -1,0 +1,32 @@
+mashups:
+  - id: mario64-in-minecraft
+    name: Mario 64 in Minecraft
+    description: Play as SM64 Mario in a Minecraft Java single-player world.
+    status: available
+    installer: mario64-minecraft
+    source: https://github.com/Zckyy/mario64-in-minecraft
+    requires:
+      games:
+        - id: minecraft-java
+          version: "1.21.4"
+        - id: super-mario-64
+      assets:
+        - id: sm64-us-rom
+          sha1: 9bef1128717f958171a4afac3ed78ee2bb4e86ce
+      tools:
+        - id: fabric-loader
+          version: ">=0.16.10"
+        - id: git
+        - id: python3
+        - id: mingw-gcc
+      mods:
+        - id: fabric-api
+          minecraftVersion: "1.21.4"
+  - id: minecraft-mw2
+    name: Minecraft × MW2 (2009)
+    description: Reserved for a verified upstream integration.
+    status: unavailable
+    requires:
+      games:
+        - id: minecraft-java
+        - id: call-of-duty-modern-warfare-2-2009

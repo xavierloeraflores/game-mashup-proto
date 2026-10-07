@@ -1,0 +1,22 @@
+{
+  "name": "game-mashup-launcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cross-platform game mashup launcher prototype",
+  "main": "dist/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc && node scripts/copy-assets.cjs",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron ."
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.0",
+    "electron": "^38.2.2",
+    "typescript": "^5.9.3"
+  }
+}
