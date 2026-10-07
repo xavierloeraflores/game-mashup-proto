@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>Game Mashup Launcher</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-icon">✳</div><div><strong>GAME<br>MASHUP</strong><small>LAUNCHER / PROTOTYPE</small></div></div>
+      <div class="nav-label">LIBRARY</div>
+      <button class="nav-item active" type="button">⌂ <span>Mashups</span></button>
+      <div class="sidebar-bottom"><div class="connection-dot"></div><span>Local-only assets</span></div>
+    </aside>
+    <main>
+      <header><div><div class="eyebrow">YOUR MASHUP LIBRARY</div><h1>Play across worlds.</h1><p>Discover installed games, prepare isolated instances, and bring them together.</p></div><button id="refresh" class="button ghost" type="button">↻ &nbsp; Rescan</button></header>
+      <div id="notice" role="status" aria-live="polite"></div>
+      <section class="hero" aria-labelledby="mario-title">
+        <div class="hero-art" aria-hidden="true"><div class="block one"></div><div class="block two"></div><div class="block three"></div><div class="orb">M</div></div>
+        <div class="hero-content"><div class="pill">FEATURED INTEGRATION</div><h2 id="mario-title">Mario 64 <em>in</em> Minecraft</h2><p>Real SM64 movement inside a Minecraft Java world. Built from upstream source, powered by your own ROM.</p><div class="hero-meta"><span>MINECRAFT JAVA 1.21.4</span><span>FABRIC</span><span>WINDOWS / MAC / LINUX CLIENT</span></div><div class="actions"><button id="install" class="button primary" type="button">Install mashup <span>↗</span></button><button id="play" class="button secondary" type="button" disabled>Play <span>▶</span></button><button id="source" class="button link" type="button">Upstream project ↗</button></div></div>
+      </section>
+      <div class="grid">
+        <section class="panel"><div class="panel-heading"><div><div class="eyebrow">INSTALL CHECKLIST</div><h3>Requirements</h3></div><span id="ready-badge" class="status-badge">Scanning</span></div><div id="requirements" class="requirements"></div><div class="panel-actions"><button id="minecraft-path" class="button subtle" type="button">Choose Minecraft directory</button><button id="rom-path" class="button subtle" type="button">Choose ROM</button><button id="toolchain-path" class="button subtle" type="button">Compiler directory</button></div></section>
+        <section class="panel"><div class="panel-heading"><div><div class="eyebrow">ON THIS COMPUTER</div><h3>Game discovery</h3></div></div><div id="games" class="games"></div><div class="note">Minecraft Launcher and Java Edition are checked separately. Steam titles use AppIDs, not display names.</div></section>
+      </div>
+      <section class="panel more"><div class="panel-heading"><div><div class="eyebrow">REGISTRY READY</div><h3>Future mashups</h3></div></div><div id="future-mashups"></div></section>
+      <section class="panel log-panel"><div class="panel-heading"><div><div class="eyebrow">INSTALLER OUTPUT</div><h3>Activity</h3></div></div><pre id="log">Waiting for an installation.</pre></section>
+    </main>
+  </div>
+  <div id="review-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="review-title">
+    <div class="review-card"><div class="review-top"><div><div class="eyebrow">REVIEWED SOURCE EXECUTION</div><h2 id="review-title">Compile libsm64</h2></div><button id="close-review" class="icon-button" type="button" aria-label="Close">×</button></div><p>This mashup requires compiling libsm64 from source. The upstream script below will run only after you choose Run. Inspect its contents and source commit first.</p><div id="review-meta" class="review-meta"></div><div id="tool-checks" class="tool-checks"></div><details><summary>View script: scripts/build-libsm64.sh</summary><pre id="script"></pre></details><div class="review-actions"><button id="cancel-build" class="button secondary" type="button">Cancel</button><button id="run-build" class="button primary" type="button">Run reviewed script</button></div></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

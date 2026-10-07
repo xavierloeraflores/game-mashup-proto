@@ -1,0 +1,146 @@
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { spawn } from 'node:child_process';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { discoverGames, resolveGameRequirements } from './core/discovery';
+import { readJson } from './core/fs';
+import { MarioInstaller, type BuildReview, type InstallOptions } from './core/mario';
+import { CrossOverSteamProvider, SteamProvider } from './core/providers/steam';
+import { ManualProvider, type Settings } from './core/providers/manual';
+import { MinecraftLauncherProvider } from './core/providers/minecraft';
+import { loadRegistry } from './core/registry';
+
+let window: BrowserWindow | undefined;
+let review: BuildReview | undefined;
+let options: InstallOptions | undefined;
+let busy = false;
+
+const dataRoot = () => app.getPath('userData');
+const settingsPath = () => join(dataRoot(), 'settings.json');
+const installer = () => new MarioInstaller(dataRoot(), line => window?.webContents.send('log', line));
+
+async function settings(): Promise<Settings> {
+  return await readJson<Settings>(settingsPath()) ?? { manualPaths: {} };
+}
+
+async function updateSettings(change: Partial<Settings>): Promise<void> {
+  const current = await settings();
+  await mkdir(dataRoot(), { recursive: true });
+  await writeFile(settingsPath(), JSON.stringify({ ...current, ...change }, null, 2));
+}
+
+async function snapshot() {
+  const registry = await loadRegistry();
+  const minecraft = new MinecraftLauncherProvider();
+  const installations = await discoverGames(registry, [minecraft, new SteamProvider(), new CrossOverSteamProvider(), new ManualProvider(settingsPath())]);
+  const mcStatus = await minecraft.inspect();
+  const saved = await settings();
+  let romValid = false;
+  let romError = '';
+  if (saved.romPath) {
+    try { await installer().validateRom(saved.romPath); romValid = true; }
+    catch (error) { romError = String(error instanceof Error ? error.message : error); }
+  }
+  const root = saved.manualPaths['minecraft-java'] || mcStatus.directories.find(path => installations['minecraft-java']?.some(item => item.path === path));
+  const checks = root ? await installer().verify(root) : [];
+  const installedRomValid = checks.find(item => item.id === 'rom-hash')?.ok ?? false;
+  const gameRequirements = resolveGameRequirements(registry, 'mario64-in-minecraft', installations, { 'super-mario-64': romValid || installedRomValid });
+  return {
+    registry, installations, minecraft: mcStatus, gameRequirements, romValid, installedRomValid, romError,
+    romPath: saved.romPath, toolchainBinPath: saved.toolchainBinPath,
+    manualPaths: saved.manualPaths,
+    minecraftRoot: root,
+    checks,
+    ready: checks.length > 0 && checks.every(item => item.ok),
+  };
+}
+
+async function chooseDirectory(): Promise<string | undefined> {
+  if (!window) return;
+  const result = await dialog.showOpenDialog(window, { properties: ['openDirectory'] });
+  return result.canceled ? undefined : result.filePaths[0];
+}
+
+async function withBusy<T>(operation: () => Promise<T>): Promise<T> {
+  if (busy) throw new Error('An installation operation is already running.');
+  busy = true;
+  try { return await operation(); } finally { busy = false; }
+}
+
+function registerIpc(): void {
+  ipcMain.handle('snapshot', snapshot);
+  ipcMain.handle('choose-minecraft', async () => {
+    const path = await chooseDirectory();
+    if (path) {
+      const current = await settings();
+      await updateSettings({ manualPaths: { ...current.manualPaths, 'minecraft-java': path } });
+    }
+    return await snapshot();
+  });
+  ipcMain.handle('choose-rom', async () => {
+    if (!window) return await snapshot();
+    const result = await dialog.showOpenDialog(window, { properties: ['openFile'], filters: [{ name: 'Super Mario 64 ROM', extensions: ['z64'] }] });
+    if (!result.canceled) {
+      await installer().validateRom(result.filePaths[0]);
+      await updateSettings({ romPath: result.filePaths[0] });
+    }
+    return await snapshot();
+  });
+  ipcMain.handle('choose-toolchain', async () => {
+    const path = await chooseDirectory();
+    if (path) await updateSettings({ toolchainBinPath: path });
+    return await snapshot();
+  });
+  ipcMain.handle('prepare', () => withBusy(async () => {
+    const state = await snapshot();
+    if (!state.minecraftRoot || !state.romPath) throw new Error('Select a Minecraft Java directory and your SM64 US ROM first.');
+    options = { minecraftRoot: state.minecraftRoot, romPath: state.romPath, toolchainBinPath: state.toolchainBinPath };
+    review = await installer().prepare(options);
+    return review;
+  }));
+  ipcMain.handle('install', (_event, approvedCommit: string) => withBusy(async () => {
+    if (!review || !options || review.sourceCommit !== approvedCommit) throw new Error('Review the exact upstream script before running it.');
+    const current = review;
+    review = undefined;
+    const receipt = await installer().install(options, current);
+    return { receipt, state: await snapshot() };
+  }));
+  ipcMain.handle('play', () => withBusy(async () => {
+    const state = await snapshot();
+    if (!state.ready || !state.minecraftRoot) throw new Error('Installation is not ready.');
+    await installer().selectProfile(state.minecraftRoot);
+    const launcher = await launcherExecutable();
+    if (launcher) {
+      const child = spawn(launcher, [], { detached: true, stdio: 'ignore', windowsHide: true });
+      child.unref();
+    } else if (process.platform === 'win32') {
+      await shell.openExternal('minecraft://');
+    } else {
+      throw new Error('Minecraft Launcher executable not found. Open Minecraft Launcher and select Mario 64 in Minecraft.');
+    }
+    return 'Minecraft Launcher opened with the Mario 64 profile selected. Press Play in Minecraft Launcher.';
+  }));
+  ipcMain.handle('open-source', async () => { await shell.openExternal('https://github.com/Zckyy/mario64-in-minecraft'); });
+}
+
+async function launcherExecutable(): Promise<string | undefined> {
+  const { exists } = await import('./core/fs');
+  const candidates = process.platform === 'win32'
+    ? [join(process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)', 'Minecraft Launcher', 'MinecraftLauncher.exe'), join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Minecraft Launcher', 'MinecraftLauncher.exe')]
+    : process.platform === 'darwin' ? ['/Applications/Minecraft.app/Contents/MacOS/launcher'] : ['/usr/bin/minecraft-launcher', '/usr/local/bin/minecraft-launcher'];
+  for (const path of candidates) if (await exists(path)) return path;
+  return undefined;
+}
+
+app.whenReady().then(() => {
+  registerIpc();
+  window = new BrowserWindow({
+    width: 1120, height: 760, minWidth: 860, minHeight: 600,
+    backgroundColor: '#11141b', title: 'Game Mashup Launcher',
+    webPreferences: { preload: join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  void window.loadFile(join(__dirname, 'ui', 'index.html'));
+  window.on('closed', () => { window = undefined; });
+});
+
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

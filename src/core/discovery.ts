@@ -4,8 +4,8 @@ export async function discoverGames(registry: Registry, providers: GameProvider[
   const result: Record<string, GameInstallation[]> = {};
   for (const game of registry.games) {
     const available = providers.filter(provider => game.providerIds.includes(provider.id));
-    const found = await Promise.all(available.map(provider => provider.discover(game)));
-    result[game.id] = found.flat();
+    const found = await Promise.allSettled(available.map(provider => provider.discover(game)));
+    result[game.id] = found.filter((item): item is PromiseFulfilledResult<GameInstallation[]> => item.status === 'fulfilled').flatMap(item => item.value);
   }
   return result;
 }

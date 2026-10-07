@@ -49,3 +49,18 @@ test('Steam uses AppIDs and libraries, not ambiguous names', async () => {
     assert.deepEqual(steamLibraryPaths('"path" "D:\\\\SteamLibrary"'), ['D:\\SteamLibrary']);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test('Call of Duty HQ alone is not mistaken for Modern Warfare II', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mashup-steam-'));
+  try {
+    const gamePath = join(root, 'steamapps', 'common', 'Call of Duty HQ');
+    await mkdir(gamePath, { recursive: true });
+    const manifestPath = join(root, 'steamapps', 'appmanifest_1938090.acf');
+    await writeFile(manifestPath, '"AppState" { "appid" "1938090" "installdir" "Call of Duty HQ" "InstalledDepots" { "1962663" { "dlcappid" "1962663" } } }');
+    const game = { id: 'call-of-duty-modern-warfare-ii-2022', name: 'MWII 2022', providerIds: ['steam'], steamAppIds: [3595230], steamParentAppId: 1938090, steamParentDlcIds: [1962660, 1962661] };
+    const provider = new SteamProvider([root]);
+    assert.equal((await provider.discover(game)).length, 0);
+    await writeFile(manifestPath, '"AppState" { "appid" "1938090" "installdir" "Call of Duty HQ" "InstalledDepots" { "2014032" { "dlcappid" "1962660" } } }');
+    assert.equal((await provider.discover(game)).length, 1);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

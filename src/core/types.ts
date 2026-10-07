@@ -4,6 +4,7 @@ export interface GameMetadata {
   providerIds: string[];
   steamAppIds?: number[];
   steamParentAppId?: number;
+  steamParentDlcIds?: number[];
   assetOnly?: boolean;
 }
 

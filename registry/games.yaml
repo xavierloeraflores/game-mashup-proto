@@ -13,5 +13,6 @@ games:
   - id: call-of-duty-modern-warfare-ii-2022
     name: "Call of Duty: Modern Warfare II (2022)"
     providerIds: [steam, crossover-steam, manual]
-    steamAppIds: [1962660]
+    steamAppIds: [3595230, 1962660]
     steamParentAppId: 1938090
+    steamParentDlcIds: [1962660, 1962661, 1962662, 3602840, 3602850, 3602860]

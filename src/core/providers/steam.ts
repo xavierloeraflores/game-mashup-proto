@@ -19,7 +19,7 @@ export class SteamProvider implements GameProvider {
   constructor(protected readonly roots = defaultSteamRoots()) {}
 
   async discover(game: GameMetadata): Promise<GameInstallation[]> {
-    if (!game.steamAppIds?.length) return [];
+    if (!game.steamAppIds?.length && !game.steamParentAppId) return [];
     const libraries = new Set<string>();
     for (const root of this.roots) {
       if (!await isDirectory(root)) continue;
@@ -31,7 +31,7 @@ export class SteamProvider implements GameProvider {
     }
     const matches: GameInstallation[] = [];
     for (const library of libraries) {
-      for (const appId of game.steamAppIds) {
+      for (const appId of game.steamAppIds ?? []) {
         const manifestPath = join(library, 'steamapps', `appmanifest_${appId}.acf`);
         if (!await exists(manifestPath)) continue;
         const manifest = await readFile(manifestPath, 'utf8');
@@ -41,6 +41,20 @@ export class SteamProvider implements GameProvider {
         const path = join(library, 'steamapps', 'common', installDir);
         if (!await isDirectory(path)) continue;
         matches.push({ gameId: game.id, providerId: this.id, path, details: `Steam AppID ${appId}` });
+      }
+      if (game.steamParentAppId && game.steamParentDlcIds?.length) {
+        const parentPath = join(library, 'steamapps', `appmanifest_${game.steamParentAppId}.acf`);
+        if (!await exists(parentPath)) continue;
+        const parent = await readFile(parentPath, 'utf8');
+        if (field(parent, 'appid') !== String(game.steamParentAppId)) continue;
+        const installedDlc = game.steamParentDlcIds.find(id => new RegExp(`"dlcappid"\\s+"${id}"`).test(parent));
+        const installDir = field(parent, 'installdir');
+        if (installedDlc && installDir) {
+          const path = join(library, 'steamapps', 'common', installDir);
+          if (await isDirectory(path) && !matches.some(item => item.path === path)) {
+            matches.push({ gameId: game.id, providerId: this.id, path, details: `Steam AppID ${game.steamParentAppId} with MWII DLC ${installedDlc}` });
+          }
+        }
       }
     }
     return matches;
