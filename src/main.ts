@@ -4,7 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { discoverGames, resolveGameRequirements } from './core/discovery';
 import { readJson } from './core/fs';
-import { MarioInstaller, type BuildReview, type InstallOptions } from './core/mario';
+import { MarioInstaller, managedFabricVersionId, type BuildReview, type InstallOptions, type InstallReceipt } from './core/mario';
 import { ManagedTools } from './core/managed-tools';
 import { CrossOverSteamProvider, SteamProvider } from './core/providers/steam';
 import { ManualProvider, type Settings } from './core/providers/manual';
@@ -137,8 +137,9 @@ function registerIpc(): void {
     const state = await snapshot();
     if ((!state.ready && !state.profileRepairable) || !state.minecraftRoot) throw new Error('Installation is not ready.');
     await installer().selectProfile(state.minecraftRoot);
+    const receipt = await readJson<InstallReceipt>(join(installer().instancePath(), 'installation.json'));
     await openMinecraftLauncher();
-    return 'Minecraft Launcher opened. In its bottom-left installation dropdown, choose “Mario 64 in Minecraft” (Fabric 1.21.4), then press Play. The official Launcher may ignore the saved profile selection.';
+    return `Minecraft Launcher opened. Select “Mario 64 in Minecraft” with version “${managedFabricVersionId(receipt!.fabricLoader)}” in its bottom-left installation dropdown, then press Play. The official Launcher may ignore the saved profile selection.`;
   }));
   ipcMain.handle('open-source', async () => { await shell.openExternal('https://github.com/Zckyy/mario64-in-minecraft'); });
 }

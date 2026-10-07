@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { strToU8, zipSync } from 'fflate';
-import { MarioInstaller, MODS_FOLDER_JVM_ARGUMENT, PROFILE_ID, ROM_SHA1, cleanProfileJvmArguments, createManagedFabricVersion, fabricInstallerSha256, githubAssetSha256, javaMajorVersion, managedFabricVersionId, validateMarioJar } from '../core/mario';
+import { ADD_MODS_JVM_ARGUMENT, MarioInstaller, MODS_FOLDER_JVM_ARGUMENT, PROFILE_ID, ROM_SHA1, cleanProfileJvmArguments, createManagedFabricVersion, fabricInstallerSha256, githubAssetSha256, javaMajorVersion, managedFabricVersionId, validateMarioJar } from '../core/mario';
 
-test('managed Fabric version passes the isolated mods folder as one JVM argument', async () => {
+test('managed Fabric version passes both isolated mod discovery arguments', async () => {
   const root = await mkdtemp(join(tmpdir(), 'mashup-version-'));
   try {
     const sourceId = 'fabric-loader-0.19.5-1.21.4';
@@ -18,7 +18,7 @@ test('managed Fabric version passes the isolated mods folder as one JVM argument
     const targetId = await createManagedFabricVersion(root, '0.19.5');
     assert.equal(targetId, managedFabricVersionId('0.19.5'));
     const target = JSON.parse(await readFile(join(root, 'versions', targetId, `${targetId}.json`), 'utf8'));
-    assert.deepEqual(target.arguments.jvm, ['-DFabricMcEmu= net.minecraft.client.main.Main ', MODS_FOLDER_JVM_ARGUMENT]);
+    assert.deepEqual(target.arguments.jvm, ['-DFabricMcEmu= net.minecraft.client.main.Main ', MODS_FOLDER_JVM_ARGUMENT, ADD_MODS_JVM_ARGUMENT]);
     assert.equal(await readFile(join(root, 'versions', targetId, `${targetId}.jar`), 'utf8'), 'Fabric version JAR');
     assert.equal(cleanProfileJvmArguments('-Xmx2G "-Dfabric.modsFolder=C:/Old Path/mods"'), '-Xmx2G');
   } finally { await rm(root, { recursive: true, force: true }); }
@@ -81,7 +81,7 @@ test('installation verification checks the isolated profile and ROM contents', a
     await mkdir(join(minecraft, 'versions', '1.21.4'), { recursive: true });
     await mkdir(join(instance, 'mods'), { recursive: true });
     await mkdir(join(instance, 'config', 'mario64'), { recursive: true });
-    await writeFile(join(minecraft, 'versions', version, `${version}.json`), JSON.stringify({ id: version, arguments: { jvm: [MODS_FOLDER_JVM_ARGUMENT] } }));
+    await writeFile(join(minecraft, 'versions', version, `${version}.json`), JSON.stringify({ id: version, arguments: { jvm: [MODS_FOLDER_JVM_ARGUMENT, ADD_MODS_JVM_ARGUMENT] } }));
     await writeFile(join(minecraft, 'versions', version, `${version}.jar`), 'Fabric version JAR');
     await writeFile(join(minecraft, 'versions', '1.21.4', '1.21.4.jar'), 'vanilla jar');
     await writeFile(join(minecraft, 'launcher_profiles.json'), JSON.stringify({ profiles: { [PROFILE_ID]: { gameDir: instance, lastVersionId: version } } }));
@@ -89,6 +89,7 @@ test('installation verification checks the isolated profile and ROM contents', a
     await writeFile(join(instance, 'installation.json'), JSON.stringify({ fabricLoader: '0.16.10', fabricApiFile: 'fabric-api-0.119.4+1.21.4.jar', fabricApiSha512: apiHash, installedVersion: '0.1.0', sha256: 'wrong' }));
     await writeFile(join(instance, 'mods', 'fabric-api-0.119.4+1.21.4.jar'), 'fake jar');
     await writeFile(join(instance, 'mods', 'mario64mc-0.1.0.jar'), 'fake jar');
+    await writeFile(join(instance, 'mashup-mods.txt'), `${join(instance, 'mods', 'mario64mc-0.1.0.jar')}\n${join(instance, 'mods', 'fabric-api-0.119.4+1.21.4.jar')}\n`);
     await writeFile(join(instance, 'config', 'mario64', 'sm64.dll'), 'fake library');
     await writeFile(join(instance, 'config', 'mario64', 'baserom.us.z64'), 'invalid rom');
     const checks = await installer.verify(minecraft);
@@ -97,6 +98,8 @@ test('installation verification checks the isolated profile and ROM contents', a
     assert.equal(checks.find(item => item.id === 'native')?.ok, true);
     assert.equal(checks.find(item => item.id === 'rom')?.ok, true);
     assert.equal(checks.find(item => item.id === 'rom-hash')?.ok, false);
+    await writeFile(join(instance, 'mashup-mods.txt'), 'missing.jar\n');
+    assert.equal((await installer.verify(minecraft)).find(item => item.id === 'fabric-profile')?.ok, false);
     await rm(join(instance, 'config', 'mario64', 'sm64.dll'));
     assert.equal((await installer.verify(minecraft)).find(item => item.id === 'native')?.ok, false);
     await writeFile(join(instance, 'mods', 'fabric-api-0.119.4+1.21.4.jar'), 'corrupt jar');

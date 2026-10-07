@@ -13,6 +13,7 @@ export const MINECRAFT_VERSION = '1.21.4';
 export const ROM_SHA1 = '9bef1128717f958171a4afac3ed78ee2bb4e86ce';
 export const PROFILE_ID = 'game-mashup-mario64';
 export const MODS_FOLDER_JVM_ARGUMENT = '-Dfabric.modsFolder=${game_directory}/mods';
+export const ADD_MODS_JVM_ARGUMENT = '-Dfabric.addMods=@${game_directory}/mashup-mods.txt';
 const REPOSITORY = 'Zckyy/mario64-in-minecraft';
 
 interface GithubAsset { name: string; browser_download_url: string; digest?: string }
@@ -101,7 +102,7 @@ export async function createManagedFabricVersion(minecraftRoot: string, loader: 
   await copyFile(join(sourceDir, `${sourceId}.jar`), join(targetDir, `${targetId}.jar`));
   await atomicJson(join(targetDir, `${targetId}.json`), {
     ...source, id: targetId,
-    arguments: { ...source.arguments, jvm: [...source.arguments.jvm, MODS_FOLDER_JVM_ARGUMENT] },
+    arguments: { ...source.arguments, jvm: [...source.arguments.jvm, MODS_FOLDER_JVM_ARGUMENT, ADD_MODS_JVM_ARGUMENT] },
   });
   return targetId;
 }
@@ -241,6 +242,7 @@ export class MarioInstaller {
     }
     await copyFile(modCache, join(modsDir, mod.name));
     await copyFile(apiCache, join(modsDir, apiFile.filename));
+    await this.writeModList(mod.name, apiFile.filename);
     await copyFile(options.romPath, join(configDir, 'baserom.us.z64'));
     // Upstream's MarioController currently opens this exact path on every OS.
     await copyFile(built, join(configDir, 'sm64.dll'));
@@ -271,7 +273,12 @@ export class MarioInstaller {
     }
     const versionMetadata = version ? await readJson<{ id?: string; arguments?: { jvm?: unknown[] } }>(join(minecraftRoot, 'versions', version, `${version}.json`)) : undefined;
     const managedVersionOk = versionMetadata?.id === version && versionMetadata?.arguments?.jvm?.includes(MODS_FOLDER_JVM_ARGUMENT) &&
+      versionMetadata.arguments.jvm.includes(ADD_MODS_JVM_ARGUMENT) &&
       await exists(join(minecraftRoot, 'versions', version!, `${version}.jar`));
+    const modName = receipt?.installedVersion && /^[\w.+-]+$/.test(receipt.installedVersion) ? `mario64mc-${receipt.installedVersion}.jar` : undefined;
+    const modList = modName && receipt?.fabricApiFile && basename(receipt.fabricApiFile) === receipt.fabricApiFile
+      ? this.modListContents(modName, receipt.fabricApiFile) : undefined;
+    const modListOk = !!modList && await readFile(join(instance, 'mashup-mods.txt'), 'utf8').then(contents => contents === modList, () => false);
     const modPath = receipt?.installedVersion && /^[\w.+-]+$/.test(receipt.installedVersion) ? join(instance, 'mods', `mario64mc-${receipt.installedVersion}.jar`) : undefined;
     const safeHash = async (path: string, algorithm: 'sha1' | 'sha256' | 'sha512') => {
       try { return await hashFile(path, algorithm); } catch { return undefined; }
@@ -289,7 +296,7 @@ export class MarioInstaller {
       { id: 'minecraft-java', ok: await isDirectory(minecraftRoot), detail: 'Minecraft Java path exists' },
       { id: 'minecraft-version', ok: await exists(join(minecraftRoot, 'versions', MINECRAFT_VERSION, `${MINECRAFT_VERSION}.jar`)), detail: `Minecraft Java ${MINECRAFT_VERSION} exists` },
       { id: 'instance', ok: await isDirectory(instance), detail: 'Managed instance exists' },
-      { id: 'fabric-profile', ok: !!version && versionAtLeast(receipt?.fabricLoader ?? '0', '0.16.10') && profileFound && !!managedVersionOk, detail: 'Managed Fabric profile points to its isolated mods folder' },
+      { id: 'fabric-profile', ok: !!version && versionAtLeast(receipt?.fabricLoader ?? '0', '0.16.10') && profileFound && !!managedVersionOk && modListOk, detail: 'Managed Fabric profile lists both isolated mod JARs' },
       { id: 'fabric-api', ok: apiOk, detail: 'Fabric API JAR matches recorded SHA-512' },
       { id: 'mario-mod', ok: modOk, detail: 'mario64mc JAR matches SHA-256 and Minecraft metadata' },
       { id: 'native', ok: await exists(join(instance, 'config', 'mario64', 'sm64.dll')), detail: 'sm64 native library exists at the path required by the mod' },
@@ -304,6 +311,9 @@ export class MarioInstaller {
     await requireMinecraftLauncherClosed();
     const receipt = await readJson<InstallReceipt>(join(this.instancePath(), 'installation.json'));
     if (!receipt?.fabricLoader) throw new Error('Fabric Loader receipt is missing.');
+    if (!receipt.installedVersion || !/^[\w.+-]+$/.test(receipt.installedVersion) ||
+        !receipt.fabricApiFile || basename(receipt.fabricApiFile) !== receipt.fabricApiFile) throw new Error('Installed mod filenames are invalid.');
+    await this.writeModList(`mario64mc-${receipt.installedVersion}.jar`, receipt.fabricApiFile);
     await this.writeProfile(minecraftRoot, receipt.fabricLoader);
     if ((await this.verify(minecraftRoot)).some(item => !item.ok)) throw new Error('Managed profile repair failed.');
     for (const name of ['launcher_profiles_microsoft_store.json', 'launcher_profiles.json']) {
@@ -396,5 +406,13 @@ export class MarioInstaller {
       lastVersionId: version, created: data.profiles[PROFILE_ID]?.created ?? new Date().toISOString(), lastUsed: new Date().toISOString(),
     };
     await atomicJson(path, data);
+  }
+
+  private modListContents(modName: string, apiName: string): string {
+    return `${join(this.instancePath(), 'mods', modName)}\n${join(this.instancePath(), 'mods', apiName)}\n`;
+  }
+
+  private async writeModList(modName: string, apiName: string): Promise<void> {
+    await writeFile(join(this.instancePath(), 'mashup-mods.txt'), this.modListContents(modName, apiName), 'utf8');
   }
 }
