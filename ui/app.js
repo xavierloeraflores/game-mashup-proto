@@ -177,5 +177,9 @@ $('run-build').addEventListener('click', () => action(async () => {
     notice('Installation files verified. In Minecraft Launcher, choose “Mario 64 in Minecraft” from the bottom-left installation dropdown, press Play, enter a single-player world, then press M with chat closed.');
   } finally { $('install').disabled = false; }
 }));
-$('play').addEventListener('click', () => action(async () => notice(await window.launcher.play())));
+$('play').addEventListener('click', () => action(async () => {
+  const message = await window.launcher.play();
+  await refresh();
+  notice(message);
+}));
 action(refresh);
