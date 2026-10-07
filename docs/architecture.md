@@ -1,0 +1,41 @@
+# Architecture and registry protocol
+
+The Electron renderer uses a sandboxed preload bridge. It cannot access the filesystem or start processes directly. The main process owns discovery, settings, downloads, build execution, launcher-profile edits, and verification. `src/core` contains the portable logic and is exercised with Node tests.
+
+## Canonical IDs and providers
+
+`registry/games.yaml` lists canonical game IDs separately from store titles. `registry/mashups.yaml` declares status, dependencies, and an installer identifier. The loader validates referenced IDs. Adding an unavailable or experimental mashup needs only a new YAML entry; the desktop library renders a placeholder card automatically. A runnable integration also needs an installer implementation, preload actions, and a detail page for its setup and play flow. The current detail pages are Mario 64 in Minecraft and Minecraft world in MW2 (2009).
+
+The `GameProvider` contract is `discover(game: GameMetadata): Promise<GameInstallation[]>`. Four providers exist:
+
+- `SteamProvider` reads library folders and `appmanifest_<AppID>.acf`, and verifies the install directory.
+- `MinecraftLauncherProvider` inspects standard Windows, macOS, and Linux Java directories and launcher profiles. A usable Java version requires its version manifest and vanilla JAR. Windows checks the normal `%APPDATA%\.minecraft` location and the Microsoft Store launcher's data location. A launcher or Bedrock package alone does not satisfy Java Edition.
+- `ManualProvider` reads explicit per-game directory overrides. For Minecraft, it enumerates installed vanilla versions rather than treating a directory alone as sufficient.
+- `CrossOverSteamProvider` scans Steam inside CrossOver bottles on macOS.
+
+The two Modern Warfare titles are distinct. The local user's 2009 game is Steam AppID `10180`. The 2022 entry considers standalone AppID `3595230` and legacy campaign AppID `1962660`; a Call of Duty HQ (`1938090`) manifest is only evidence when it contains an MWII DLC marker. HQ or Warzone alone is not treated as Modern Warfare II. See the [2009 Steam listing](https://store.steampowered.com/app/10180/Call_of_Duty_Modern_Warfare_2/) and [2022 Steam listing](https://store.steampowered.com/app/3595230/Call_of_Duty_Modern_Warfare_II/).
+
+## Mario installation
+
+The integration declares `minecraft-java` version `1.21.4`, `super-mario-64`, asset `sm64-us-rom`, Fabric Loader `>=0.16.10`, Fabric API for `1.21.4`, and Git/Python/compiler build tools. The ROM is a local asset; SHA-1 must match `9bef1128717f958171a4afac3ed78ee2bb4e86ce`, as documented in the [upstream requirements](https://github.com/Zckyy/mario64-in-minecraft#requirements). It is never fetched or uploaded.
+
+Install performs these stages:
+
+1. Verify Minecraft Java 1.21.4 and the selected ROM.
+2. Read the [latest upstream release](https://github.com/Zckyy/mario64-in-minecraft/releases) and clone that release tag into launcher data. Show the exact `scripts/build-libsm64.sh` and source commit for explicit approval. Check Git, Bash, Python 3, GCC/Make, and Java 21. Chosen compiler, Python, and Java directories are prepended to child-process PATH only; the launcher never edits global PATH. On Windows x64, **Download build tools** retrieves checksum-verified [Python](https://www.python.org/downloads/release/python-31314/), [w64devkit](https://github.com/skeeto/w64devkit/releases/tag/v2.10.0), and [Adoptium Java 21](https://api.adoptium.net/) archives into launcher data. Git for Windows still supplies Git and Bash.
+3. Execute the reviewed script with captured stdout/stderr. Reject a changed source commit or script hash. Confirm the built library exists.
+4. Use the [official Fabric metadata API](https://meta.fabricmc.net/) and official Maven installer to install a compatible stable loader for 1.21.4. Check the Maven SHA-256 sidecar against the cached or downloaded installer JAR before executing it. Create a dedicated Minecraft Launcher profile with the managed game directory.
+5. Download the upstream release JAR and a matching [Fabric API](https://modrinth.com/mod/fabric-api/versions?g=1.21.4&l=fabric) release. Require GitHub's SHA-256 asset digest for the release JAR and Modrinth's SHA-512 file hash for Fabric API; compare each with the cache or download before installation. Read `fabric.mod.json` from the Mario JAR and require the expected mod ID, release version, and explicit Minecraft 1.21.4 compatibility. Verify both installed JAR hashes and the Mario metadata again before showing Ready to Play. Cache the files and place them in the managed instance. Copy the locally verified ROM and native library into `config/mario64`.
+6. Write `installation.json` recording repository, release tag, URL, date, installed version, local SHA-256, Fabric versions, source commit, instance path, and profile ID. Verify all required files, profile metadata, and ROM checksum before showing Ready to Play.
+
+The managed instance is inside the selected Minecraft game directory at `game-mashup-mario64`. The installer writes only its own profile key and managed instance files; it does not clear unrelated Minecraft mods. Reinstalling into the same instance replaces its own files but leaves unrelated files present. The ROM source path is saved only in local launcher settings so it can be revalidated; the copied ROM stays in the managed instance. Neither is sent to a server.
+
+The upstream project says to enter a single-player world and press **M** to activate Mario. See its [installation and controls](https://github.com/Zckyy/mario64-in-minecraft#installation).
+
+## Current limits
+
+- The Minecraft Launcher owns sign-in and entitlement checks. The desktop app opens the selected profile there; the user presses Play inside Minecraft Launcher. Direct game launch is not implemented because the official launcher does not expose a verified profile launch command to this prototype.
+- The app checks that Minecraft Launcher is closed before installing or selecting a profile. The running launcher can overwrite changes to its profile file; close it and reopen the source review before installation.
+- The upstream native mod is documented as tested on Windows x64. The build script names Linux/macOS outputs, but the mod currently opens a file named `sm64.dll` on every platform. The launcher copies the platform's compiled library to that exact name in the instance. Linux and macOS still require end-to-end validation.
+- The MW2 (2009) integration uses the upstream 2010 Rust Rewrite Mashup v0.4.0 Windows x64 release. The launcher pins the ZIP and executable SHA-256 hashes, extracts to its user-data directory, and starts IW4L with the detected Steam multiplayer folder as a read-only game root. Other platforms require upstream source builds and are not yet packaged by this installer.
+- Windows x64 has an optional launcher-managed tool download. Other platforms use guided tool selection. The launcher does not modify global tool installations.

@@ -1,0 +1,41 @@
+name: Desktop build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            package: win
+            artifact: windows-portable
+            path: releases/*.exe
+          - os: macos-latest
+            package: mac
+            artifact: macos-dmg
+            path: releases/*.dmg
+          - os: ubuntu-latest
+            package: linux
+            artifact: linux-appimage
+            path: releases/*.AppImage
+    runs-on: ${{ matrix.os }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run package:${{ matrix.package }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.path }}
+          if-no-files-found: error
