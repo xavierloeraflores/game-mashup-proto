@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('launcher', {
   chooseToolchain: () => ipcRenderer.invoke('choose-toolchain'),
   choosePython: () => ipcRenderer.invoke('choose-python'),
   chooseJava: () => ipcRenderer.invoke('choose-java'),
+  installManagedTools: () => ipcRenderer.invoke('install-managed-tools'),
   prepare: () => ipcRenderer.invoke('prepare'),
   install: (commit: string) => ipcRenderer.invoke('install', commit),
   play: () => ipcRenderer.invoke('play'),

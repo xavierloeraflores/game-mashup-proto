@@ -17,4 +17,6 @@ Build a distributable on the matching operating system with `npm run package:win
 
 The launcher never downloads a ROM or bypasses Minecraft sign-in. Its first integration uses an isolated game directory under the launcher's app data, with the Fabric profile registered in the official Minecraft Launcher. [Upstream](https://github.com/Zckyy/mario64-in-minecraft#limitations) has tested the native mod on Windows x64; macOS and Linux native builds are included as experimental paths and need real-game verification. The Play button selects the managed profile and opens Minecraft Launcher; the user then presses Play there to use the launcher's normal authentication.
 
+On Windows x64, **Download build tools** installs checksum-verified portable Python, GCC/Make, and Java 21 into the launcher's data directory. Git for Windows still supplies Git and Bash. The app changes PATH only for its build child processes. Existing portable tool directories can also be selected manually.
+
 See [docs/architecture.md](docs/architecture.md) for the protocol and [docs/acceptance.md](docs/acceptance.md) for the real-world acceptance path.

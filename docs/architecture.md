@@ -22,7 +22,7 @@ The integration declares `minecraft-java` version `1.21.4`, `super-mario-64`, as
 Install performs these stages:
 
 1. Verify Minecraft Java 1.21.4 and the selected ROM.
-2. Read the [latest upstream release](https://github.com/Zckyy/mario64-in-minecraft/releases) and clone that release tag into launcher data. Show the exact `scripts/build-libsm64.sh` and source commit for explicit approval. Check Git, Bash, Python 3, GCC/Make, and Java 21. Chosen compiler, Python, and Java directories are prepended to child-process PATH only; the launcher never edits global PATH.
+2. Read the [latest upstream release](https://github.com/Zckyy/mario64-in-minecraft/releases) and clone that release tag into launcher data. Show the exact `scripts/build-libsm64.sh` and source commit for explicit approval. Check Git, Bash, Python 3, GCC/Make, and Java 21. Chosen compiler, Python, and Java directories are prepended to child-process PATH only; the launcher never edits global PATH. On Windows x64, **Download build tools** retrieves checksum-verified [Python](https://www.python.org/downloads/release/python-31314/), [w64devkit](https://github.com/skeeto/w64devkit/releases/tag/v2.10.0), and [Adoptium Java 21](https://api.adoptium.net/) archives into launcher data. Git for Windows still supplies Git and Bash.
 3. Execute the reviewed script with captured stdout/stderr. Reject a changed source commit or script hash. Confirm the built library exists.
 4. Use the [official Fabric metadata API](https://meta.fabricmc.net/) and official Maven installer to install a compatible stable loader for 1.21.4. Create a dedicated Minecraft Launcher profile with the managed game directory.
 5. Download the upstream release JAR and a matching [Fabric API](https://modrinth.com/mod/fabric-api/versions?g=1.21.4&l=fabric) release. Cache them and place them in the managed instance. Copy the locally verified ROM and native library into `config/mario64`.
@@ -37,4 +37,4 @@ The upstream project says to enter a single-player world and press **M** to acti
 - The Minecraft Launcher owns sign-in and entitlement checks. The desktop app opens the selected profile there; the user presses Play inside Minecraft Launcher. Direct game launch is not implemented because the official launcher does not expose a verified profile launch command to this prototype.
 - The upstream native mod is documented as tested on Windows x64. The script names Linux/macOS outputs, but those platforms still require end-to-end validation.
 - Upstream has not published a verified MW2 mashup package. The registry keeps that concept unavailable rather than inventing a repository.
-- Tool dependencies use guided installation. The launcher does not download or modify global Git, Python, Java, or compiler installations.
+- Windows x64 has an optional launcher-managed tool download. Other platforms use guided tool selection. The launcher does not modify global tool installations.

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { discoverGames, resolveGameRequirements } from './core/discovery';
 import { readJson } from './core/fs';
 import { MarioInstaller, type BuildReview, type InstallOptions } from './core/mario';
+import { ManagedTools } from './core/managed-tools';
 import { CrossOverSteamProvider, SteamProvider } from './core/providers/steam';
 import { ManualProvider, type Settings } from './core/providers/manual';
 import { MinecraftLauncherProvider } from './core/providers/minecraft';
@@ -54,6 +55,7 @@ async function snapshot() {
     manualPaths: saved.manualPaths,
     minecraftRoot: root,
     checks,
+    managedToolsAvailable: process.platform === 'win32' && process.arch === 'x64',
     ready: checks.length > 0 && checks.every(item => item.ok),
   };
 }
@@ -104,6 +106,11 @@ function registerIpc(): void {
     if (path) await updateSettings({ javaBinPath: path });
     return await snapshot();
   });
+  ipcMain.handle('install-managed-tools', () => withBusy(async () => {
+    const paths = await new ManagedTools(dataRoot(), line => window?.webContents.send('log', line)).installWindows();
+    await updateSettings(paths);
+    return await snapshot();
+  }));
   ipcMain.handle('prepare', () => withBusy(async () => {
     const state = await snapshot();
     if (!state.minecraftRoot || !state.romPath) throw new Error('Select a Minecraft Java directory and your SM64 US ROM first.');

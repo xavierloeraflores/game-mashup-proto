@@ -19,13 +19,28 @@
     "appId": "dev.gamemashup.launcher",
     "productName": "Game Mashup Launcher",
     "asar": true,
-    "directories": { "output": "releases" },
-    "files": ["dist/**/*", "registry/**/*", "package.json"],
-    "win": { "target": "portable" },
-    "mac": { "target": "dmg" },
-    "linux": { "target": "AppImage", "category": "Game" }
+    "asarUnpack": ["node_modules/7zip-bin/**"],
+    "directories": {
+      "output": "releases"
+    },
+    "files": [
+      "dist/**/*",
+      "registry/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Game"
+    }
   },
   "dependencies": {
+    "7zip-bin": "^5.2.0",
     "yaml": "^2.8.1"
   },
   "devDependencies": {

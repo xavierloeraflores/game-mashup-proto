@@ -67,6 +67,7 @@ function render(data) {
   }
 
   $('play').disabled = !data.ready;
+  $('managed-tools').hidden = !data.managedToolsAvailable;
   const badge = $('ready-badge');
   badge.textContent = data.ready ? 'READY TO PLAY' : 'SETUP NEEDED';
   badge.className = `status-badge${data.ready ? ' ready' : ''}`;
@@ -93,6 +94,12 @@ $('rom-path').addEventListener('click', () => action(async () => render(await wi
 $('toolchain-path').addEventListener('click', () => action(async () => render(await window.launcher.chooseToolchain())));
 $('python-path').addEventListener('click', () => action(async () => render(await window.launcher.choosePython())));
 $('java-path').addEventListener('click', () => action(async () => render(await window.launcher.chooseJava())));
+$('managed-tools').addEventListener('click', () => action(async () => {
+  $('managed-tools').disabled = true;
+  notice('Downloading checksum-verified Python, GCC/Make, and Java 21 into launcher data.');
+  try { render(await window.launcher.installManagedTools()); notice('Build tools are ready in launcher data.'); }
+  finally { $('managed-tools').disabled = false; }
+}));
 $('source').addEventListener('click', () => action(() => window.launcher.openSource()));
 $('install').addEventListener('click', () => action(async () => {
   if (!state?.minecraftRoot || !state.gameRequirements.find(item => item.id === 'minecraft-java')?.satisfied) { notice('Install and run Minecraft: Java Edition 1.21.4 in Minecraft Launcher, then choose its .minecraft directory.'); return; }
