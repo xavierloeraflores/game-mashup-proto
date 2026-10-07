@@ -12,6 +12,7 @@ import { commandWorks, run, type LogHandler } from './process';
 export const MINECRAFT_VERSION = '1.21.4';
 export const ROM_SHA1 = '9bef1128717f958171a4afac3ed78ee2bb4e86ce';
 export const PROFILE_ID = 'game-mashup-mario64';
+export const MODS_FOLDER_JVM_ARGUMENT = '-Dfabric.modsFolder=${game_directory}/mods';
 const REPOSITORY = 'Zckyy/mario64-in-minecraft';
 
 interface GithubAsset { name: string; browser_download_url: string; digest?: string }
@@ -76,12 +77,33 @@ function versionAtLeast(actual: string, minimum: string): boolean {
   return true;
 }
 
-export function managedJvmArguments(instance: string, existing?: unknown): string {
-  const modsDir = join(instance, 'mods').replace(/\\/g, '/');
-  if (modsDir.includes('"')) throw new Error('The managed instance path cannot contain a double quote.');
-  const base = typeof existing === 'string' && existing.trim() ? existing.trim() : '-Xmx2G';
-  const withoutOverride = base.replace(/(?:^|\s)(?:"-Dfabric\.modsFolder=[^"]*"|-Dfabric\.modsFolder=\S+)/g, '').trim();
-  return `${withoutOverride} "-Dfabric.modsFolder=${modsDir}"`;
+export function managedFabricVersionId(loader: string): string {
+  if (!/^\d+\.\d+\.\d+$/.test(loader)) throw new Error('Invalid Fabric Loader version.');
+  return `game-mashup-fabric-loader-${loader}-${MINECRAFT_VERSION}`;
+}
+
+export function cleanProfileJvmArguments(existing?: unknown): string | undefined {
+  if (typeof existing !== 'string') return undefined;
+  return existing.replace(/(?:^|\s)(?:"-Dfabric\.modsFolder=[^"]*"|-Dfabric\.modsFolder=\S+)/g, '').trim() || undefined;
+}
+
+export async function createManagedFabricVersion(minecraftRoot: string, loader: string): Promise<string> {
+  const sourceId = `fabric-loader-${loader}-${MINECRAFT_VERSION}`;
+  const targetId = managedFabricVersionId(loader);
+  const sourceDir = join(minecraftRoot, 'versions', sourceId);
+  const targetDir = join(minecraftRoot, 'versions', targetId);
+  const source = await readJson<{ id?: string; inheritsFrom?: string; mainClass?: string; arguments?: { jvm?: unknown[]; game?: unknown[] }; [key: string]: unknown }>(join(sourceDir, `${sourceId}.json`));
+  if (source?.id !== sourceId || source.inheritsFrom !== MINECRAFT_VERSION || source.mainClass !== 'net.fabricmc.loader.impl.launch.knot.KnotClient' || !Array.isArray(source.arguments?.jvm)) {
+    throw new Error('Fabric Loader version metadata is missing or unexpected.');
+  }
+  if (!await exists(join(sourceDir, `${sourceId}.jar`))) throw new Error('Fabric Loader version JAR is missing.');
+  await mkdir(targetDir, { recursive: true });
+  await copyFile(join(sourceDir, `${sourceId}.jar`), join(targetDir, `${targetId}.jar`));
+  await atomicJson(join(targetDir, `${targetId}.json`), {
+    ...source, id: targetId,
+    arguments: { ...source.arguments, jvm: [...source.arguments.jvm, MODS_FOLDER_JVM_ARGUMENT] },
+  });
+  return targetId;
 }
 
 export function javaMajorVersion(output: string): number | undefined {
@@ -240,13 +262,16 @@ export class MarioInstaller {
   async verify(minecraftRoot: string): Promise<InstallationCheck[]> {
     const instance = this.instancePath();
     const receipt = await readJson<InstallReceipt>(join(instance, 'installation.json'));
-    const version = receipt?.fabricLoader ? `fabric-loader-${receipt.fabricLoader}-${MINECRAFT_VERSION}` : undefined;
+    const version = receipt?.fabricLoader && /^\d+\.\d+\.\d+$/.test(receipt.fabricLoader) ? managedFabricVersionId(receipt.fabricLoader) : undefined;
     const profileFiles = ['launcher_profiles.json', 'launcher_profiles_microsoft_store.json'];
     let profileFound = false;
     for (const name of profileFiles) {
       const data = await readJson<{ profiles?: Record<string, { gameDir?: string; lastVersionId?: string }> }>(join(minecraftRoot, name));
       if (data?.profiles?.[PROFILE_ID]?.gameDir === instance && data.profiles[PROFILE_ID].lastVersionId === version) profileFound = true;
     }
+    const versionMetadata = version ? await readJson<{ id?: string; arguments?: { jvm?: unknown[] } }>(join(minecraftRoot, 'versions', version, `${version}.json`)) : undefined;
+    const managedVersionOk = versionMetadata?.id === version && versionMetadata?.arguments?.jvm?.includes(MODS_FOLDER_JVM_ARGUMENT) &&
+      await exists(join(minecraftRoot, 'versions', version!, `${version}.jar`));
     const modPath = receipt?.installedVersion && /^[\w.+-]+$/.test(receipt.installedVersion) ? join(instance, 'mods', `mario64mc-${receipt.installedVersion}.jar`) : undefined;
     const safeHash = async (path: string, algorithm: 'sha1' | 'sha256' | 'sha512') => {
       try { return await hashFile(path, algorithm); } catch { return undefined; }
@@ -264,7 +289,7 @@ export class MarioInstaller {
       { id: 'minecraft-java', ok: await isDirectory(minecraftRoot), detail: 'Minecraft Java path exists' },
       { id: 'minecraft-version', ok: await exists(join(minecraftRoot, 'versions', MINECRAFT_VERSION, `${MINECRAFT_VERSION}.jar`)), detail: `Minecraft Java ${MINECRAFT_VERSION} exists` },
       { id: 'instance', ok: await isDirectory(instance), detail: 'Managed instance exists' },
-      { id: 'fabric-profile', ok: !!version && versionAtLeast(receipt?.fabricLoader ?? '0', '0.16.10') && profileFound && await exists(join(minecraftRoot, 'versions', version, `${version}.json`)), detail: 'Fabric profile/config exists' },
+      { id: 'fabric-profile', ok: !!version && versionAtLeast(receipt?.fabricLoader ?? '0', '0.16.10') && profileFound && !!managedVersionOk, detail: 'Managed Fabric profile points to its isolated mods folder' },
       { id: 'fabric-api', ok: apiOk, detail: 'Fabric API JAR matches recorded SHA-512' },
       { id: 'mario-mod', ok: modOk, detail: 'mario64mc JAR matches SHA-256 and Minecraft metadata' },
       { id: 'native', ok: await exists(join(instance, 'config', 'mario64', 'sm64.dll')), detail: 'sm64 native library exists at the path required by the mod' },
@@ -275,14 +300,16 @@ export class MarioInstaller {
 
   async selectProfile(minecraftRoot: string): Promise<void> {
     const checks = await this.verify(minecraftRoot);
-    if (checks.some(item => !item.ok)) throw new Error('Installation is not ready to play.');
+    if (checks.some(item => !item.ok && item.id !== 'fabric-profile')) throw new Error('Installation assets are not ready to play.');
     await requireMinecraftLauncherClosed();
+    const receipt = await readJson<InstallReceipt>(join(this.instancePath(), 'installation.json'));
+    if (!receipt?.fabricLoader) throw new Error('Fabric Loader receipt is missing.');
+    await this.writeProfile(minecraftRoot, receipt.fabricLoader);
+    if ((await this.verify(minecraftRoot)).some(item => !item.ok)) throw new Error('Managed profile repair failed.');
     for (const name of ['launcher_profiles_microsoft_store.json', 'launcher_profiles.json']) {
       const path = join(minecraftRoot, name);
       const data = await readJson<Record<string, unknown>>(path);
       if (data && typeof data.profiles === 'object' && data.profiles !== null && PROFILE_ID in data.profiles) {
-        const profiles = data.profiles as Record<string, Record<string, unknown>>;
-        profiles[PROFILE_ID].javaArgs = managedJvmArguments(this.instancePath(), profiles[PROFILE_ID].javaArgs);
         data.selectedProfile = PROFILE_ID;
         await atomicJson(path, data);
         return;
@@ -362,10 +389,10 @@ export class MarioInstaller {
     const path = join(minecraftRoot, name);
     const data = await readJson<{ profiles?: Record<string, Record<string, unknown>>; [key: string]: unknown }>(path) ?? { profiles: {} };
     data.profiles ??= {};
-    const version = `fabric-loader-${loader}-${MINECRAFT_VERSION}`;
+    const version = await createManagedFabricVersion(minecraftRoot, loader);
     data.profiles[PROFILE_ID] = {
       ...data.profiles[PROFILE_ID], name: 'Mario 64 in Minecraft', type: 'custom', gameDir: this.instancePath(),
-      javaArgs: managedJvmArguments(this.instancePath(), data.profiles[PROFILE_ID]?.javaArgs),
+      javaArgs: cleanProfileJvmArguments(data.profiles[PROFILE_ID]?.javaArgs),
       lastVersionId: version, created: data.profiles[PROFILE_ID]?.created ?? new Date().toISOString(), lastUsed: new Date().toISOString(),
     };
     await atomicJson(path, data);

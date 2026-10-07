@@ -59,6 +59,8 @@ async function snapshot() {
     buildTools,
     managedToolsAvailable: process.platform === 'win32' && process.arch === 'x64',
     ready: checks.length > 0 && checks.every(item => item.ok),
+    profileRepairable: checks.length > 0 && checks.some(item => item.id === 'fabric-profile' && !item.ok) &&
+      checks.every(item => item.id === 'fabric-profile' || item.ok),
   };
 }
 
@@ -133,7 +135,7 @@ function registerIpc(): void {
   }));
   ipcMain.handle('play', () => withBusy(async () => {
     const state = await snapshot();
-    if (!state.ready || !state.minecraftRoot) throw new Error('Installation is not ready.');
+    if ((!state.ready && !state.profileRepairable) || !state.minecraftRoot) throw new Error('Installation is not ready.');
     await installer().selectProfile(state.minecraftRoot);
     await openMinecraftLauncher();
     return 'Minecraft Launcher opened. In its bottom-left installation dropdown, choose “Mario 64 in Minecraft” (Fabric 1.21.4), then press Play. The official Launcher may ignore the saved profile selection.';

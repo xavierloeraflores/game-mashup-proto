@@ -1,17 +1,27 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { strToU8, zipSync } from 'fflate';
-import { MarioInstaller, PROFILE_ID, ROM_SHA1, fabricInstallerSha256, githubAssetSha256, javaMajorVersion, managedJvmArguments, validateMarioJar } from '../core/mario';
+import { MarioInstaller, MODS_FOLDER_JVM_ARGUMENT, PROFILE_ID, ROM_SHA1, cleanProfileJvmArguments, createManagedFabricVersion, fabricInstallerSha256, githubAssetSha256, javaMajorVersion, managedFabricVersionId, validateMarioJar } from '../core/mario';
 
-test('managed profile points Fabric at its isolated mods folder', () => {
-  const args = managedJvmArguments('C:\\Games With Spaces\\mario64');
-  assert.equal(args, '-Xmx2G "-Dfabric.modsFolder=C:/Games With Spaces/mario64/mods"');
-  assert.equal(managedJvmArguments('C:\\Games With Spaces\\mario64', args), args);
-  assert.equal(managedJvmArguments('/games/mario64', '-Xmx4G -Dfabric.modsFolder=/old/mods'), '-Xmx4G "-Dfabric.modsFolder=/games/mario64/mods"');
+test('managed Fabric version passes the isolated mods folder as one JVM argument', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mashup-version-'));
+  try {
+    const sourceId = 'fabric-loader-0.19.5-1.21.4';
+    const sourceDir = join(root, 'versions', sourceId);
+    await mkdir(sourceDir, { recursive: true });
+    await writeFile(join(sourceDir, `${sourceId}.json`), JSON.stringify({ id: sourceId, inheritsFrom: '1.21.4', mainClass: 'net.fabricmc.loader.impl.launch.knot.KnotClient', arguments: { jvm: ['-DFabricMcEmu= net.minecraft.client.main.Main '], game: [] } }));
+    await writeFile(join(sourceDir, `${sourceId}.jar`), 'Fabric version JAR');
+    const targetId = await createManagedFabricVersion(root, '0.19.5');
+    assert.equal(targetId, managedFabricVersionId('0.19.5'));
+    const target = JSON.parse(await readFile(join(root, 'versions', targetId, `${targetId}.json`), 'utf8'));
+    assert.deepEqual(target.arguments.jvm, ['-DFabricMcEmu= net.minecraft.client.main.Main ', MODS_FOLDER_JVM_ARGUMENT]);
+    assert.equal(await readFile(join(root, 'versions', targetId, `${targetId}.jar`), 'utf8'), 'Fabric version JAR');
+    assert.equal(cleanProfileJvmArguments('-Xmx2G "-Dfabric.modsFolder=C:/Old Path/mods"'), '-Xmx2G');
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 test('GitHub release JAR requires a complete SHA-256 digest', () => {
@@ -66,12 +76,13 @@ test('installation verification checks the isolated profile and ROM contents', a
     const minecraft = join(root, '.minecraft');
     const installer = new MarioInstaller(root);
     const instance = installer.instancePath();
-    const version = 'fabric-loader-0.16.10-1.21.4';
+    const version = managedFabricVersionId('0.16.10');
     await mkdir(join(minecraft, 'versions', version), { recursive: true });
     await mkdir(join(minecraft, 'versions', '1.21.4'), { recursive: true });
     await mkdir(join(instance, 'mods'), { recursive: true });
     await mkdir(join(instance, 'config', 'mario64'), { recursive: true });
-    await writeFile(join(minecraft, 'versions', version, `${version}.json`), '{}');
+    await writeFile(join(minecraft, 'versions', version, `${version}.json`), JSON.stringify({ id: version, arguments: { jvm: [MODS_FOLDER_JVM_ARGUMENT] } }));
+    await writeFile(join(minecraft, 'versions', version, `${version}.jar`), 'Fabric version JAR');
     await writeFile(join(minecraft, 'versions', '1.21.4', '1.21.4.jar'), 'vanilla jar');
     await writeFile(join(minecraft, 'launcher_profiles.json'), JSON.stringify({ profiles: { [PROFILE_ID]: { gameDir: instance, lastVersionId: version } } }));
     const apiHash = createHash('sha512').update('fake jar').digest('hex');
