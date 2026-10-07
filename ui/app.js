@@ -130,8 +130,9 @@ $('install').addEventListener('click', () => action(async () => {
       java: 'Java: install a Java 21 runtime, then choose its bin directory in the app.',
     };
     const missing = Object.entries(review.buildTools).filter(([, ready]) => !ready).map(([tool]) => instructions[tool]);
+    if (review.launcherRunning) missing.push('Close Minecraft Launcher completely, then reopen this review. It can overwrite Fabric profiles while running.');
     $('missing-guidance').hidden = missing.length === 0;
-    $('missing-guidance').textContent = missing.length ? `Install the missing tools, then reopen this review:\n${missing.join('\n')}` : '';
+    $('missing-guidance').textContent = missing.join('\n');
     $('run-build').disabled = missing.length > 0;
     $('review-overlay').classList.remove('hidden');
   } finally { $('install').disabled = false; }

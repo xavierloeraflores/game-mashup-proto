@@ -6,6 +6,7 @@ import { basename, dirname, join } from 'node:path';
 import { strFromU8, unzipSync } from 'fflate';
 import { download, getJson, getText, hashFile } from './download';
 import { exists, isDirectory, readJson } from './fs';
+import { minecraftLauncherRunning, requireMinecraftLauncherClosed } from './launcher-process';
 import { commandWorks, run, type LogHandler } from './process';
 
 export const MINECRAFT_VERSION = '1.21.4';
@@ -29,6 +30,7 @@ export interface BuildReview {
   scriptPath: string;
   script: string;
   buildTools: BuildToolStatus;
+  launcherRunning: boolean;
   romSha1: string;
 }
 
@@ -155,10 +157,12 @@ export class MarioInstaller {
     const script = await readFile(scriptPath, 'utf8');
     const scriptSha256 = createHash('sha256').update(script).digest('hex');
     const buildTools = await this.inspectTools(options);
-    return { source: `https://github.com/${REPOSITORY}`, releaseTag: release.tag_name, sourceCommit, scriptSha256, scriptPath, script, buildTools, romSha1 };
+    const launcherRunning = await minecraftLauncherRunning();
+    return { source: `https://github.com/${REPOSITORY}`, releaseTag: release.tag_name, sourceCommit, scriptSha256, scriptPath, script, buildTools, launcherRunning, romSha1 };
   }
 
   async install(options: InstallOptions, approved: Pick<BuildReview, 'sourceCommit' | 'scriptSha256' | 'releaseTag'>): Promise<InstallReceipt> {
+    await requireMinecraftLauncherClosed();
     const review = await this.prepare(options);
     if (review.sourceCommit !== approved.sourceCommit || review.scriptSha256 !== approved.scriptSha256 || review.releaseTag !== approved.releaseTag) {
       throw new Error('The source changed since review. Review the script again.');
@@ -264,6 +268,7 @@ export class MarioInstaller {
   async selectProfile(minecraftRoot: string): Promise<void> {
     const checks = await this.verify(minecraftRoot);
     if (checks.some(item => !item.ok)) throw new Error('Installation is not ready to play.');
+    await requireMinecraftLauncherClosed();
     for (const name of ['launcher_profiles_microsoft_store.json', 'launcher_profiles.json']) {
       const path = join(minecraftRoot, name);
       const data = await readJson<Record<string, unknown>>(path);
