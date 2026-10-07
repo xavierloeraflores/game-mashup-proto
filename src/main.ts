@@ -41,7 +41,10 @@ async function snapshot() {
     try { await installer().validateRom(saved.romPath); romValid = true; }
     catch (error) { romError = String(error instanceof Error ? error.message : error); }
   }
-  const root = saved.manualPaths['minecraft-java'] || mcStatus.directories.find(path => installations['minecraft-java']?.some(item => item.path === path));
+  const root = saved.manualPaths['minecraft-java']
+    || mcStatus.installations.find(item => item.version === '1.21.4')?.rootPath
+    || mcStatus.installations[0]?.rootPath
+    || mcStatus.rootDirectories[0];
   const checks = root ? await installer().verify(root) : [];
   const installedRomValid = checks.find(item => item.id === 'rom-hash')?.ok ?? false;
   const gameRequirements = resolveGameRequirements(registry, 'mario64-in-minecraft', installations, { 'super-mario-64': romValid || installedRomValid });

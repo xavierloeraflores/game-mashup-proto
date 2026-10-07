@@ -95,7 +95,7 @@ $('python-path').addEventListener('click', () => action(async () => render(await
 $('java-path').addEventListener('click', () => action(async () => render(await window.launcher.chooseJava())));
 $('source').addEventListener('click', () => action(() => window.launcher.openSource()));
 $('install').addEventListener('click', () => action(async () => {
-  if (!state?.minecraftRoot || !state.gameRequirements[0].satisfied) { notice('Install and run Minecraft: Java Edition 1.21.4 in Minecraft Launcher, then choose its .minecraft directory.'); return; }
+  if (!state?.minecraftRoot || !state.gameRequirements.find(item => item.id === 'minecraft-java')?.satisfied) { notice('Install and run Minecraft: Java Edition 1.21.4 in Minecraft Launcher, then choose its .minecraft directory.'); return; }
   if (!state.romValid) { notice('Super Mario 64 ROM required\nThis mashup requires your own Super Mario 64 USA ROM. Choose a .z64 file.'); return; }
   $('install').disabled = true;
   try {

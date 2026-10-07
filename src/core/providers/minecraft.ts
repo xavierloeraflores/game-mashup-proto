@@ -12,6 +12,7 @@ export interface MinecraftDiscovery {
   javaUsable: boolean;
   bedrockDetected: boolean;
   directories: string[];
+  rootDirectories: string[];
   installations: GameInstallation[];
 }
 
@@ -26,6 +27,7 @@ export class MinecraftLauncherProvider implements GameProvider {
   async inspect(game: GameMetadata = { id: 'minecraft-java', name: 'Minecraft: Java Edition', providerIds: [this.id] }): Promise<MinecraftDiscovery> {
     const roots = this.candidateRoots();
     const directories = new Set<string>();
+    const rootDirectories: string[] = [];
     const installations: GameInstallation[] = [];
     let launcherInstalled = false;
     let bedrockDetected = false;
@@ -38,6 +40,7 @@ export class MinecraftLauncherProvider implements GameProvider {
     }
     for (const root of roots) {
       if (!await isDirectory(root)) continue;
+      rootDirectories.push(root);
       directories.add(root);
       const profileFiles = ['launcher_profiles.json', 'launcher_profiles_microsoft_store.json'];
       for (const file of profileFiles) {
@@ -52,7 +55,7 @@ export class MinecraftLauncherProvider implements GameProvider {
               const version = await readJson<{ inheritsFrom?: string }>(versionPath);
               const gameVersion = version?.inheritsFrom ?? profile.lastVersionId;
               if (await exists(join(root, 'versions', gameVersion, `${gameVersion}.jar`))) {
-                installations.push({ gameId: game.id, providerId: this.id, path: gameDir, version: gameVersion, profileId, details: profile.name });
+                installations.push({ gameId: game.id, providerId: this.id, path: gameDir, rootPath: root, version: gameVersion, profileId, details: profile.name });
               }
             }
           }
@@ -68,13 +71,13 @@ export class MinecraftLauncherProvider implements GameProvider {
           if (!gameVersion) continue;
           // A version manifest alone may be left behind after uninstall. Vanilla's JAR must exist.
           if (!await exists(join(versionsDir, gameVersion, `${gameVersion}.jar`))) continue;
-          installations.push({ gameId: game.id, providerId: this.id, path: root, version: gameVersion, profileId: version, details: version });
+          installations.push({ gameId: game.id, providerId: this.id, path: root, rootPath: root, version: gameVersion, profileId: version, details: version });
         }
       }
     }
     const unique = new Map<string, GameInstallation>();
     for (const item of installations) unique.set(`${item.path}|${item.version}|${item.profileId}`, item);
-    return { launcherInstalled, javaUsable: unique.size > 0, bedrockDetected, directories: [...directories], installations: [...unique.values()] };
+    return { launcherInstalled, javaUsable: unique.size > 0, bedrockDetected, directories: [...directories], rootDirectories, installations: [...unique.values()] };
   }
 
   private candidateRoots(): string[] {

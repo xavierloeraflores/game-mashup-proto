@@ -12,6 +12,7 @@ export interface GameInstallation {
   gameId: string;
   providerId: string;
   path: string;
+  rootPath?: string;
   version?: string;
   profileId?: string;
   details?: string;

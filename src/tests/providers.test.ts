@@ -33,6 +33,8 @@ test('Minecraft provider reads a custom game directory and exact installed versi
     const result = await new MinecraftLauncherProvider(home, 'linux').inspect();
     assert.equal(result.javaUsable, true);
     assert.ok(result.installations.some(item => item.path === custom && item.version === '1.21.4'));
+    assert.equal(result.installations.find(item => item.path === custom)?.rootPath, root);
+    assert.ok(result.rootDirectories.includes(root));
   } finally { await rm(home, { recursive: true, force: true }); }
 });
 
