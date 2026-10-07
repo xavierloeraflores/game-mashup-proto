@@ -63,8 +63,28 @@ function render(data) {
     description.append(title, summary);
     const badge = document.createElement('span');
     badge.className = 'status-badge muted';
-    badge.textContent = mashup.status.toUpperCase();
+    badge.textContent = mashup.id === 'minecraft-mw2' && !data.mw2Supported ? 'WINDOWS X64' : mashup.status.toUpperCase();
     item.append(description, badge);
+    if (mashup.id === 'minecraft-mw2') {
+      const actions = document.createElement('div');
+      actions.className = 'future-actions';
+      const install = document.createElement('button');
+      install.className = 'button primary';
+      install.textContent = data.mw2Ready ? 'Repair install' : 'Install';
+      install.disabled = !data.mw2Path || !data.mw2Supported;
+      install.addEventListener('click', () => action(async () => {
+        install.disabled = true;
+        try { render(await window.launcher.installMw2()); notice('MW2 mashup installed. Choose Play to open the Minecraft world.'); }
+        finally { install.disabled = false; }
+      }));
+      const play = document.createElement('button');
+      play.className = 'button secondary';
+      play.textContent = 'Play Minecraft world ▶';
+      play.disabled = !data.mw2Ready;
+      play.addEventListener('click', () => action(async () => notice(await window.launcher.playMw2())));
+      actions.append(install, play);
+      item.append(actions);
+    }
     future.append(item);
   }
 

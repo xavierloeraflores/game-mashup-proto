@@ -23,10 +23,11 @@ mashups:
         - id: fabric-api
           minecraftVersion: "1.21.4"
   - id: minecraft-mw2
-    name: Minecraft × MW2 (2009)
-    description: Reserved for a verified upstream integration.
-    status: unavailable
+    name: Minecraft world in MW2 (2009)
+    description: Fight through a generated Minecraft world with MW2 weapons using IW4L. Windows x64 release.
+    status: available
+    installer: iw4l-minecraft
+    source: https://github.com/chasmlol/2010-rust-rewrite-mashup
     requires:
       games:
-        - id: minecraft-java
         - id: call-of-duty-modern-warfare-2-2009

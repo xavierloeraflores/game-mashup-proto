@@ -10,6 +10,7 @@ import { CrossOverSteamProvider, SteamProvider } from './core/providers/steam';
 import { ManualProvider, type Settings } from './core/providers/manual';
 import { MinecraftLauncherProvider } from './core/providers/minecraft';
 import { loadRegistry } from './core/registry';
+import { MW2Installer } from './core/mw2';
 
 let window: BrowserWindow | undefined;
 let review: BuildReview | undefined;
@@ -19,6 +20,7 @@ let busy = false;
 const dataRoot = () => app.getPath('userData');
 const settingsPath = () => join(dataRoot(), 'settings.json');
 const installer = () => new MarioInstaller(dataRoot(), line => window?.webContents.send('log', line));
+const mw2Installer = () => new MW2Installer(dataRoot(), line => window?.webContents.send('log', line));
 
 async function settings(): Promise<Settings> {
   return await readJson<Settings>(settingsPath()) ?? { manualPaths: {} };
@@ -53,6 +55,9 @@ async function snapshot() {
     checks.every(item => item.ok || item.id === 'rom' || item.id === 'rom-hash' || item.id === 'fabric-profile');
   const installedRomValid = checks.find(item => item.id === 'rom-hash')?.ok ?? false;
   const gameRequirements = resolveGameRequirements(registry, 'mario64-in-minecraft', installations, { 'super-mario-64': romValid || installedRomValid });
+  const mw2Path = installations['call-of-duty-modern-warfare-2-2009']?.[0]?.path;
+  const mw2Supported = process.platform === 'win32' && process.arch === 'x64';
+  const mw2Ready = mw2Supported && !!mw2Path && await mw2Installer().verify();
   return {
     registry, installations, minecraft: mcStatus, gameRequirements, romValid, installedRomValid, romError,
     romPath: saved.romPath, toolchainBinPath: saved.toolchainBinPath, pythonBinPath: saved.pythonBinPath, javaBinPath: saved.javaBinPath,
@@ -65,6 +70,7 @@ async function snapshot() {
     romRepairable,
     profileRepairable: checks.length > 0 && checks.some(item => item.id === 'fabric-profile' && !item.ok) &&
       checks.every(item => item.id === 'fabric-profile' || item.ok),
+    mw2Path, mw2Ready, mw2Supported,
   };
 }
 
@@ -152,6 +158,18 @@ function registerIpc(): void {
     return `Minecraft Launcher opened. Select “Mario 64 in Minecraft” with version “${managedFabricVersionId(receipt!.fabricLoader)}” in its bottom-left installation dropdown, then press Play. The official Launcher may ignore the saved profile selection.`;
   }));
   ipcMain.handle('open-source', async () => { await shell.openExternal('https://github.com/Zckyy/mario64-in-minecraft'); });
+  ipcMain.handle('install-mw2', () => withBusy(async () => {
+    const state = await snapshot();
+    if (!state.mw2Path) throw new Error('Install MW2 (2009) multiplayer through Steam first.');
+    await mw2Installer().install();
+    return await snapshot();
+  }));
+  ipcMain.handle('play-mw2', () => withBusy(async () => {
+    const state = await snapshot();
+    if (!state.mw2Path) throw new Error('MW2 (2009) multiplayer was not found.');
+    await mw2Installer().play(state.mw2Path);
+    return 'IW4L started. On first launch, confirm your MW2 folder and choose whether you own Skate 3. The Minecraft world should then load.';
+  }));
 }
 
 async function openMinecraftLauncher(): Promise<void> {
